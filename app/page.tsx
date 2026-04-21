@@ -178,10 +178,7 @@ export default function Page() {
 
       <footer className="border-t border-border/60">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground md:flex-row md:px-6">
-          <p className="flex items-center gap-1.5">
-            Dibuat dengan <Heart className="h-3.5 w-3.5 text-primary" /> di v0
-          </p>
-          <p>© {new Date().getFullYear()} Snapbooth</p>
+          <p>© {new Date().getFullYear()} Photostrip</p>
         </div>
       </footer>
     </main>
