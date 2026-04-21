@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Camera,
   Download,
@@ -13,10 +13,11 @@ import { Controls } from './controls'
 import { PhotoStrip } from './photo-strip'
 import { PosePanel } from './pose-panel'
 import { FILTERS, type FilterId } from './filters'
-import { CHARACTERS, type CharacterId } from './characters'
+import { buildPoseSequence, type Pose } from './poses'
 import { cn } from '@/lib/utils'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error' | 'capturing'
+type FacingMode = 'user' | 'environment'
 
 export function Photobooth() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -29,15 +30,20 @@ export function Photobooth() {
   // Settings
   const [filterId, setFilterId] = useState<FilterId>('none')
   const [frameColor, setFrameColor] = useState('cream')
-  const [characterId, setCharacterId] = useState<CharacterId>('bunny')
   const [shotCount, setShotCount] = useState(4)
   const [countdownSeconds, setCountdownSeconds] = useState(3)
   const [mirror, setMirror] = useState(true)
   const [caption, setCaption] = useState('Snapbooth')
   const [showDate, setShowDate] = useState(true)
 
-  const character =
-    CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0]
+  // Mobile: facing camera
+  const [facingMode, setFacingMode] = useState<FacingMode>('user')
+  const [canFlipCamera, setCanFlipCamera] = useState(false)
+
+  // Pose sequence — diacak & di-loop sebanyak shotCount
+  const [poseSequence, setPoseSequence] = useState<Pose[]>(() =>
+    buildPoseSequence(4),
+  )
 
   // Capture state
   const [countdown, setCountdown] = useState<number | null>(null)
@@ -48,46 +54,86 @@ export function Photobooth() {
   const filterCss =
     FILTERS.find((f) => f.id === filterId)?.css ?? 'none'
 
-  // Start camera
-  const startCamera = useCallback(async () => {
-    setStatus('loading')
-    setError(null)
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Browser kamu tidak mendukung akses kamera.')
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 960 },
-        },
-        audio: false,
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play().catch(() => {})
-      }
-      setStatus('ready')
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.name === 'NotAllowedError'
-            ? 'Izin kamera ditolak. Aktifkan di pengaturan browser.'
-            : err.message
-          : 'Gagal mengakses kamera.'
-      setError(message)
-      setStatus('error')
+  // Keep pose-sequence length in sync with shotCount
+  useEffect(() => {
+    setPoseSequence((prev) => {
+      if (prev.length === shotCount) return prev
+      return buildPoseSequence(shotCount)
+    })
+  }, [shotCount])
+
+  // Detect multi-camera (mobile usually has front+back)
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      return
     }
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => {
+        const cams = devices.filter((d) => d.kind === 'videoinput')
+        setCanFlipCamera(cams.length > 1)
+      })
+      .catch(() => {})
+  }, [status])
+
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
   }, [])
+
+  // Start camera with given facingMode
+  const startCamera = useCallback(
+    async (mode: FacingMode = facingMode) => {
+      setStatus('loading')
+      setError(null)
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error('Browser kamu tidak mendukung akses kamera.')
+        }
+        stopStream()
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: mode },
+            width: { ideal: 1280 },
+            height: { ideal: 960 },
+          },
+          audio: false,
+        })
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          // iOS Safari needs explicit play after srcObject
+          await videoRef.current.play().catch(() => {})
+        }
+        setFacingMode(mode)
+        // Auto-mirror only for selfie (user) cam
+        setMirror(mode === 'user')
+        setStatus('ready')
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.name === 'NotAllowedError'
+              ? 'Izin kamera ditolak. Aktifkan di pengaturan browser.'
+              : err.message
+            : 'Gagal mengakses kamera.'
+        setError(message)
+        setStatus('error')
+      }
+    },
+    [facingMode, stopStream],
+  )
+
+  const flipCamera = useCallback(() => {
+    const next: FacingMode = facingMode === 'user' ? 'environment' : 'user'
+    void startCamera(next)
+  }, [facingMode, startCamera])
 
   // Stop camera on unmount
   useEffect(() => {
     return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop())
+      stopStream()
     }
-  }, [])
+  }, [stopStream])
 
   // Capture single photo from video
   const capturePhoto = useCallback((): string | null => {
@@ -152,7 +198,13 @@ export function Photobooth() {
 
   const resetPhotos = useCallback(() => {
     setPhotos([])
-  }, [])
+    // Acak lagi supaya sesi berikutnya pose-nya beda
+    setPoseSequence(buildPoseSequence(shotCount))
+  }, [shotCount])
+
+  const reshufflePoses = useCallback(() => {
+    setPoseSequence(buildPoseSequence(shotCount))
+  }, [shotCount])
 
   const handleDownload = useCallback(() => {
     const canvas = stripCanvasRef.current
@@ -177,7 +229,7 @@ export function Photobooth() {
           await navigator.share({
             files: [file],
             title: 'Snapbooth',
-            text: 'Photo strip dari Snapbooth ✨',
+            text: 'Photo strip dari Snapbooth',
           })
         } catch {
           // user cancelled
@@ -191,6 +243,17 @@ export function Photobooth() {
   const hasResult = photos.length === shotCount && photos.length > 0
   const busy = status === 'capturing'
 
+  // Pose yang sedang ditampilkan di panel & PIP
+  const activePose = useMemo(() => {
+    const idx = Math.min(currentShot, poseSequence.length - 1)
+    return poseSequence[idx] ?? poseSequence[0]
+  }, [currentShot, poseSequence])
+
+  const poseTitles = useMemo(
+    () => poseSequence.map((p) => p.title),
+    [poseSequence],
+  )
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       {/* LEFT: Camera / Strip */}
@@ -198,10 +261,10 @@ export function Photobooth() {
         {hasResult ? (
           <ResultView
             photos={photos}
+            poseTitles={poseTitles}
             frameColor={frameColor}
             caption={caption}
             showDate={showDate}
-            character={character}
             onCanvasReady={(c) => (stripCanvasRef.current = c)}
             onRetake={() => {
               resetPhotos()
@@ -214,7 +277,12 @@ export function Photobooth() {
         ) : (
           <>
             {/* Pose example panel — muncul DI ATAS kamera */}
-            <PosePanel character={character} active={status === 'capturing'} />
+            <PosePanel
+              pose={activePose}
+              active={status === 'capturing'}
+              index={Math.min(currentShot, poseSequence.length - 1)}
+              total={poseSequence.length}
+            />
 
             <CameraStage
               ref={videoRef}
@@ -226,27 +294,29 @@ export function Photobooth() {
               flash={flash}
               currentShot={currentShot}
               totalShots={shotCount}
-              character={character}
-              onRequestCamera={startCamera}
+              pose={activePose}
+              canFlipCamera={canFlipCamera}
+              onRequestCamera={() => void startCamera()}
+              onFlipCamera={flipCamera}
             />
 
             {/* Capture CTA */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Sparkles className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
                     {status === 'ready'
                       ? busy
-                        ? `Mengambil foto ${currentShot + 1} dari ${shotCount}...`
+                        ? `Memotret ${currentShot + 1}/${shotCount}...`
                         : 'Kamera siap!'
                       : 'Kamera belum aktif'}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {status === 'ready'
-                      ? `${shotCount} foto · hitungan ${countdownSeconds} detik`
+                      ? `${shotCount} foto · ${countdownSeconds}d · pose random`
                       : 'Aktifkan kamera untuk mulai'}
                   </p>
                 </div>
@@ -256,7 +326,7 @@ export function Photobooth() {
                 onClick={runCaptureSequence}
                 disabled={status !== 'ready'}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold shadow-lg transition',
+                  'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold shadow-lg transition sm:w-auto',
                   'bg-primary text-primary-foreground hover:brightness-110',
                   'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
                 )}
@@ -282,14 +352,13 @@ export function Photobooth() {
           onFilterChange={setFilterId}
           selectedFrame={frameColor}
           onFrameChange={setFrameColor}
-          selectedCharacter={characterId}
-          onCharacterChange={setCharacterId}
           shotCount={shotCount}
           onShotCountChange={setShotCount}
           countdownSeconds={countdownSeconds}
           onCountdownChange={setCountdownSeconds}
           mirror={mirror}
           onMirrorChange={setMirror}
+          onShufflePoses={reshufflePoses}
           disabled={busy}
         />
       </aside>
@@ -299,10 +368,10 @@ export function Photobooth() {
 
 function ResultView({
   photos,
+  poseTitles,
   frameColor,
   caption,
   showDate,
-  character,
   onCanvasReady,
   onRetake,
   onDownload,
@@ -311,10 +380,10 @@ function ResultView({
   onShowDateChange,
 }: {
   photos: string[]
+  poseTitles: string[]
   frameColor: string
   caption: string
   showDate: boolean
-  character: (typeof CHARACTERS)[number]
   onCanvasReady: (c: HTMLCanvasElement) => void
   onRetake: () => void
   onDownload: () => void
@@ -323,14 +392,14 @@ function ResultView({
   onShowDateChange: (v: boolean) => void
 }) {
   return (
-    <div className="grid gap-5 rounded-2xl border bg-card p-6 shadow-sm md:grid-cols-[auto_1fr]">
+    <div className="grid gap-5 rounded-2xl border bg-card p-5 shadow-sm sm:p-6 md:grid-cols-[auto_1fr]">
       <div className="flex justify-center md:justify-start">
         <PhotoStrip
           photos={photos}
+          poseTitles={poseTitles}
           frameColorId={frameColor}
           caption={caption}
           showDate={showDate}
-          character={character}
           onCanvasReady={onCanvasReady}
         />
       </div>
@@ -338,7 +407,7 @@ function ResultView({
         <div className="space-y-4">
           <div>
             <h2 className="font-serif text-3xl leading-tight text-balance">
-              Photo strip kamu sudah siap ✨
+              Photo strip kamu sudah siap
             </h2>
             <p className="mt-1 text-sm text-muted-foreground text-pretty">
               Atur caption & tanggal, lalu unduh atau bagikan ke teman.
@@ -354,7 +423,7 @@ function ResultView({
               value={caption}
               onChange={(e) => onCaptionChange(e.target.value)}
               maxLength={32}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
               placeholder="Tulis sesuatu..."
             />
           </label>
@@ -374,7 +443,7 @@ function ResultView({
           <button
             type="button"
             onClick={onDownload}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg transition hover:brightness-110"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition hover:brightness-110"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             Download
@@ -382,7 +451,7 @@ function ResultView({
           <button
             type="button"
             onClick={onShare}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold transition hover:bg-secondary"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
           >
             <Share2 className="h-4 w-4" aria-hidden="true" />
             Bagikan
@@ -390,7 +459,7 @@ function ResultView({
           <button
             type="button"
             onClick={onRetake}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold transition hover:bg-secondary"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Ambil Lagi

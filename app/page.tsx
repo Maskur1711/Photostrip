@@ -61,12 +61,13 @@ export default function Page() {
             100% di browser · tanpa upload ke server
           </div>
           <h1 className="mx-auto mt-5 max-w-3xl font-serif text-5xl leading-[1.05] tracking-tight text-balance md:text-7xl">
-            Bikin <em className="italic text-primary">photo strip</em> cantik
-            dalam hitungan detik.
+            Bikin <em className="italic text-primary">photo strip</em> lucu
+            dengan 20 pose kartun.
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground text-pretty md:text-lg">
-            Nyalakan kamera, pilih filter favoritmu, dan dapatkan photo strip
-            ala photobooth klasik — siap diunduh atau dibagikan.
+            Pose solo & couple ala Zootopia muncul acak setiap jepretan —
+            tinggal tiru ilustrasinya, kamera otomatis memotret. Ringan di HP,
+            tanpa upload ke server.
           </p>
           <div className="mt-7 flex items-center justify-center gap-3">
             <a
@@ -120,13 +121,13 @@ export default function Page() {
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             <FeatureCard
               icon={<Sparkles className="h-5 w-5" aria-hidden="true" />}
-              title="8 Filter Estetik"
-              description="Dari Vintage hangat sampai Noir dramatis, pilih mood yang pas untuk momenmu."
+              title="20 Pose Random"
+              description="10 pose solo + 10 pose couple bergaya Zootopia, muncul bergantian acak tiap jepretan."
             />
             <FeatureCard
               icon={<Camera className="h-5 w-5" aria-hidden="true" />}
-              title="Auto Countdown"
-              description="Hitungan mundur 3 atau 5 detik, 3-4 foto berturut-turut — tinggal pose!"
+              title="Mobile Friendly"
+              description="Dibangun dengan SVG ringan. Toggle kamera depan-belakang langsung dari HP."
             />
             <FeatureCard
               icon={<Heart className="h-5 w-5" aria-hidden="true" />}
@@ -162,12 +163,12 @@ export default function Page() {
               />
               <Step
                 n={2}
-                title="Pilih gaya"
-                desc="Eksperimen dengan filter, warna frame, dan jumlah foto."
+                title="Tiru pose"
+                desc="Ilustrasi pose muncul di atas kamera — solo atau couple, berganti tiap foto."
               />
               <Step
                 n={3}
-                title="Pose & simpan"
+                title="Download"
                 desc="Tekan 'Mulai Memotret', pose, lalu download photo strip-nya."
               />
             </ol>
