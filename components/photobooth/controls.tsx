@@ -1,24 +1,21 @@
 'use client'
 
-import Image from 'next/image'
-import { Check, FlipHorizontal2 } from 'lucide-react'
+import { Check, FlipHorizontal2, Shuffle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FILTERS, FRAME_COLORS, type FilterId } from './filters'
-import { CHARACTERS, type CharacterId } from './characters'
 
 interface ControlsProps {
   selectedFilter: FilterId
   onFilterChange: (id: FilterId) => void
   selectedFrame: string
   onFrameChange: (id: string) => void
-  selectedCharacter: CharacterId
-  onCharacterChange: (id: CharacterId) => void
   shotCount: number
   onShotCountChange: (n: number) => void
   countdownSeconds: number
   onCountdownChange: (n: number) => void
   mirror: boolean
   onMirrorChange: (v: boolean) => void
+  onShufflePoses: () => void
   disabled?: boolean
 }
 
@@ -27,58 +24,41 @@ export function Controls({
   onFilterChange,
   selectedFrame,
   onFrameChange,
-  selectedCharacter,
-  onCharacterChange,
   shotCount,
   onShotCountChange,
   countdownSeconds,
   onCountdownChange,
   mirror,
   onMirrorChange,
+  onShufflePoses,
   disabled,
 }: ControlsProps) {
   return (
     <div className="space-y-6">
-      {/* Character picker */}
-      <section>
-        <SectionHeader title="Karakter Pose" />
-        <div className="grid grid-cols-3 gap-2">
-          {CHARACTERS.map((c) => {
-            const active = c.id === selectedCharacter
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onCharacterChange(c.id)}
-                disabled={disabled}
-                aria-pressed={active}
-                aria-label={`${c.name} si ${c.species}`}
-                className={cn(
-                  'group relative aspect-square overflow-hidden rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-50',
-                  active
-                    ? 'border-primary ring-2 ring-primary/40'
-                    : 'border-border hover:border-foreground/30',
-                )}
-                style={{ backgroundColor: c.accent }}
-              >
-                <Image
-                  src={c.image || '/placeholder.svg'}
-                  alt=""
-                  fill
-                  sizes="80px"
-                  className="object-cover"
-                />
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-foreground/85 to-transparent px-1.5 py-1 text-left text-[10px] font-semibold text-background">
-                  {c.name}
-                </span>
-                {active && (
-                  <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
-                    <Check className="h-3 w-3" aria-hidden="true" />
-                  </span>
-                )}
-              </button>
-            )
-          })}
+      {/* Pose info / shuffle */}
+      <section className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <Shuffle className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">20 Pose Lucu Random</p>
+            <p className="mt-0.5 text-xs text-muted-foreground text-pretty">
+              Solo & couple bergantian. Setiap foto dapat pose berbeda — ikuti ilustrasi di atas kamera!
+            </p>
+            <button
+              type="button"
+              onClick={onShufflePoses}
+              disabled={disabled}
+              className={cn(
+                'mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-background px-3 py-1.5 text-xs font-semibold text-primary transition',
+                'hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50',
+              )}
+            >
+              <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
+              Acak ulang pose
+            </button>
+          </div>
         </div>
       </section>
 
@@ -141,7 +121,7 @@ export function Controls({
                 aria-pressed={active}
                 aria-label={`Frame ${c.label}`}
                 className={cn(
-                  'relative h-10 w-10 rounded-full border-2 transition disabled:cursor-not-allowed disabled:opacity-50',
+                  'relative h-11 w-11 rounded-full border-2 transition disabled:cursor-not-allowed disabled:opacity-50',
                   active
                     ? 'border-primary ring-2 ring-primary/40 ring-offset-2 ring-offset-background'
                     : 'border-border hover:border-foreground/40',
@@ -173,7 +153,7 @@ export function Controls({
                 onClick={() => onShotCountChange(n)}
                 disabled={disabled}
                 className={cn(
-                  'flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+                  'flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
                   shotCount === n
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border hover:border-foreground/30',
@@ -195,7 +175,7 @@ export function Controls({
                 onClick={() => onCountdownChange(n)}
                 disabled={disabled}
                 className={cn(
-                  'flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+                  'flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
                   countdownSeconds === n
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border hover:border-foreground/30',
@@ -216,7 +196,7 @@ export function Controls({
           onClick={() => onMirrorChange(!mirror)}
           disabled={disabled}
           className={cn(
-            'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+            'flex min-h-11 w-full items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
             mirror
               ? 'border-primary bg-primary/5'
               : 'border-border hover:border-foreground/30',
