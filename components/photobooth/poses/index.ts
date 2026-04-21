@@ -1,6 +1,7 @@
 import * as S from './scenes'
 
 export type PoseType = 'solo' | 'couple'
+export type PoseMode = 'solo' | 'couple' | 'mix'
 
 export interface Pose {
   id: string
@@ -190,16 +191,24 @@ export function shufflePoses<T>(list: T[]): T[] {
 /**
  * Build a looping sequence of exactly `count` poses, drawing from a
  * shuffled deck so consecutive poses are always distinct.
+ * @param mode 'solo' | 'couple' | 'mix' — filter pool pose
  */
-export function buildPoseSequence(count: number): Pose[] {
-  const shuffled = shufflePoses(POSES)
+export function buildPoseSequence(
+  count: number,
+  mode: PoseMode = 'mix',
+): Pose[] {
+  const pool =
+    mode === 'mix' ? POSES : POSES.filter((p) => p.type === mode)
+  const shuffled = shufflePoses(pool)
   const seq: Pose[] = []
   let deck = shuffled
   let idx = 0
   while (seq.length < count) {
     if (idx >= deck.length) {
-      // reshuffle to keep it feeling fresh when count > POSES.length
-      deck = shufflePoses(POSES).filter((p) => p.id !== seq[seq.length - 1]?.id)
+      // reshuffle to keep it feeling fresh when count > pool.length
+      deck = shufflePoses(pool).filter(
+        (p) => p.id !== seq[seq.length - 1]?.id,
+      )
       idx = 0
     }
     seq.push(deck[idx])

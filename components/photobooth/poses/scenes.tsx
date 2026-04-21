@@ -225,6 +225,58 @@ function ThumbsUpHand({
   )
 }
 
+/** Judy's ZPD badge — gold star on a dark circle. */
+function ZpdBadge({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={6.5} fill="#1A2E4A" stroke={STROKE} strokeWidth={1} />
+      <Star cx={cx} cy={cy} size={8} color="#F2C94C" />
+    </g>
+  )
+}
+
+/** Nick's signature striped tie (purple/lavender). */
+function NickTie({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <g>
+      {/* knot */}
+      <path
+        d={`M${cx - 5} ${cy} L ${cx + 5} ${cy} L ${cx + 3} ${cy + 6} L ${cx - 3} ${cy + 6} Z`}
+        fill="#6E4A8A"
+        stroke={STROKE}
+        strokeWidth={1}
+        strokeLinejoin="round"
+      />
+      {/* body */}
+      <path
+        d={`M${cx - 4} ${cy + 6} L ${cx + 4} ${cy + 6} L ${cx + 6} ${cy + 28} L ${cx} ${cy + 34} L ${cx - 6} ${cy + 28} Z`}
+        fill="#8A69A8"
+        stroke={STROKE}
+        strokeWidth={1}
+        strokeLinejoin="round"
+      />
+      {/* stripes */}
+      <path d={`M${cx - 5} ${cy + 12} L ${cx + 5} ${cy + 14}`} stroke="#4A3266" strokeWidth={1.6} strokeLinecap="round" />
+      <path d={`M${cx - 5.5} ${cy + 20} L ${cx + 5.5} ${cy + 22}`} stroke="#4A3266" strokeWidth={1.6} strokeLinecap="round" />
+    </g>
+  )
+}
+
+/** Nick's Hawaiian shirt collar (just the V-neck and leaf hint over torso). */
+function NickCollar({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <g>
+      <path
+        d={`M${cx - 14} ${cy} L ${cx - 4} ${cy - 6} L ${cx} ${cy + 2} L ${cx + 4} ${cy - 6} L ${cx + 14} ${cy} Z`}
+        fill="#FFFFFF"
+        stroke={STROKE}
+        strokeWidth={1.1}
+        strokeLinejoin="round"
+      />
+    </g>
+  )
+}
+
 /** Rock horn hand — pinky and index up. */
 function RockHand({
   cx,
@@ -257,13 +309,16 @@ export function BunnyPeaceWink({ className, showBackdrop, backdropColor = '#FEF0
       <Sparkle cx={200} cy={50} size={8} color="#F2C94C" />
       <Sparkle cx={210} cy={160} size={5} color="#F2B4AC" />
       {/* body */}
-      <Body cx={120} color="#FCE6E0" />
+      {/* Judy in her ZPD uniform — navy blue with gold badge */}
+      <Body cx={120} color="#2D4B7A" />
       {/* left arm down */}
-      <Arm x1={107} y1={110} x2={88} y2={150} color="#FCE6E0" />
-      <Hand cx={88} cy={150} color="#FCE6E0" />
+      <Arm x1={107} y1={110} x2={88} y2={150} color="#2D4B7A" />
+      <Hand cx={88} cy={150} color="#B7B8BD" />
       {/* right arm up peace */}
-      <Arm x1={133} y1={108} x2={158} y2={70} color="#FCE6E0" />
-      <PeaceHand cx={158} cy={62} color="#FCE6E0" />
+      <Arm x1={133} y1={108} x2={158} y2={70} color="#2D4B7A" />
+      <PeaceHand cx={158} cy={62} color="#B7B8BD" />
+      {/* ZPD badge */}
+      <ZpdBadge cx={105} cy={120} />
       <Bunny cx={120} cy={75} winkRight mouthOpen={false} />
     </svg>
   )
@@ -277,13 +332,20 @@ export function FoxHeartHands({ className, showBackdrop, backdropColor = '#FFE8D
       <Heart cx={120} cy={30} size={14} color="#E84B6A" />
       <Heart cx={50} cy={60} size={8} color="#F5A7A0" />
       <Heart cx={195} cy={50} size={10} color="#F5A7A0" />
-      <Body cx={120} color="#E8944A" />
+      {/* Nick's green Hawaiian shirt */}
+      <Body cx={120} color="#3F7A4F" />
+      {/* leafy pattern hints */}
+      <circle cx={110} cy={125} r={3} fill="#6AA87C" opacity={0.7} />
+      <circle cx={128} cy={140} r={2.5} fill="#6AA87C" opacity={0.7} />
+      <circle cx={118} cy={155} r={3} fill="#6AA87C" opacity={0.7} />
       {/* arms up */}
-      <Arm x1={107} y1={108} x2={100} y2={60} color="#E8944A" />
-      <Arm x1={133} y1={108} x2={140} y2={60} color="#E8944A" />
-      <Hand cx={110} cy={55} color="#E8944A" r={7} />
-      <Hand cx={130} cy={55} color="#E8944A" r={7} />
+      <Arm x1={107} y1={108} x2={100} y2={60} color="#3F7A4F" />
+      <Arm x1={133} y1={108} x2={140} y2={60} color="#3F7A4F" />
+      <Hand cx={110} cy={55} color="#D8722E" r={7} />
+      <Hand cx={130} cy={55} color="#D8722E" r={7} />
       <Heart cx={120} cy={50} size={11} color="#E84B6A" />
+      <NickCollar cx={120} cy={102} />
+      <NickTie cx={120} cy={103} />
       <Fox cx={120} cy={80} sparkleEyes />
     </svg>
   )
@@ -464,20 +526,26 @@ export function CoupleHeartTogether({ className, showBackdrop, backdropColor = '
       <Heart cx={210} cy={55} size={8} color="#F5A7A0" />
       <Sparkle cx={50} cy={160} size={5} color="#F2C94C" />
       <Sparkle cx={200} cy={170} size={5} color="#F2C94C" />
-      {/* bodies */}
-      <Body cx={C_LEFT} color="#FCE6E0" w={40} />
-      <Body cx={C_RIGHT} color="#E8944A" w={40} />
+      {/* bodies — Judy ZPD blue + Nick green shirt */}
+      <Body cx={C_LEFT} color="#2D4B7A" w={40} />
+      <Body cx={C_RIGHT} color="#3F7A4F" w={40} />
+      {/* Nick's leafy pattern */}
+      <circle cx={152} cy={125} r={2.5} fill="#6AA87C" opacity={0.7} />
+      <circle cx={168} cy={140} r={2.5} fill="#6AA87C" opacity={0.7} />
       {/* outer arms down */}
-      <Arm x1={69} y1={108} x2={55} y2={145} color="#FCE6E0" />
-      <Hand cx={55} cy={148} color="#FCE6E0" />
-      <Arm x1={171} y1={108} x2={185} y2={145} color="#E8944A" />
-      <Hand cx={185} cy={148} color="#E8944A" />
+      <Arm x1={69} y1={108} x2={55} y2={145} color="#2D4B7A" />
+      <Hand cx={55} cy={148} color="#B7B8BD" />
+      <Arm x1={171} y1={108} x2={185} y2={145} color="#3F7A4F" />
+      <Hand cx={185} cy={148} color="#D8722E" />
       {/* inner arms meet in middle forming heart */}
-      <Arm x1={92} y1={106} x2={115} y2={60} color="#FCE6E0" />
-      <Hand cx={115} cy={58} color="#FCE6E0" r={7} />
-      <Arm x1={148} y1={106} x2={125} y2={60} color="#E8944A" />
-      <Hand cx={125} cy={58} color="#E8944A" r={7} />
+      <Arm x1={92} y1={106} x2={115} y2={60} color="#2D4B7A" />
+      <Hand cx={115} cy={58} color="#B7B8BD" r={7} />
+      <Arm x1={148} y1={106} x2={125} y2={60} color="#3F7A4F" />
+      <Hand cx={125} cy={58} color="#D8722E" r={7} />
       <Heart cx={120} cy={55} size={18} color="#E84B6A" />
+      <ZpdBadge cx={65} cy={118} />
+      <NickCollar cx={C_RIGHT} cy={102} />
+      <NickTie cx={C_RIGHT} cy={103} />
       <Bunny cx={C_LEFT} cy={75} sparkleEyes />
       <Fox cx={C_RIGHT} cy={75} sparkleEyes flip />
     </svg>

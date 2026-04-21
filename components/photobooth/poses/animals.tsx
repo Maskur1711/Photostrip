@@ -29,6 +29,8 @@ export interface HeadProps {
   crown?: boolean
   /** flip horizontally (for couples facing each other) */
   flip?: boolean
+  /** iris color — overrides character default */
+  eyeColor?: string
 }
 
 const STROKE = '#2A1F1A'
@@ -43,6 +45,7 @@ function Eyes({
   closed,
   sparkle,
   shades,
+  iris,
 }: {
   cx: number
   cy: number
@@ -51,6 +54,7 @@ function Eyes({
   closed?: boolean
   sparkle?: boolean
   shades?: boolean
+  iris?: string
 }) {
   if (shades) {
     return (
@@ -74,6 +78,7 @@ function Eyes({
       </g>
     )
   }
+  const hasIris = !!iris
   const leftEye = (() => {
     if (closed || winkLeft) {
       return (
@@ -88,11 +93,17 @@ function Eyes({
     }
     return (
       <g>
-        <ellipse cx={cx - 8} cy={cy} rx={3} ry={3.5} fill={STROKE} />
-        <circle cx={cx - 7} cy={cy - 1.2} r={1} fill="#FFFFFF" />
-        {sparkle && (
-          <circle cx={cx - 9} cy={cy + 1} r={0.6} fill="#FFFFFF" />
+        {/* scleral white (big expressive Zootopia eye) */}
+        <ellipse cx={cx - 8} cy={cy} rx={4.2} ry={5} fill="#FFFFFF" stroke={STROKE} strokeWidth={0.9} />
+        {/* iris */}
+        {hasIris && (
+          <ellipse cx={cx - 8} cy={cy + 0.4} rx={3.2} ry={4} fill={iris} />
         )}
+        {/* pupil */}
+        <ellipse cx={cx - 8} cy={cy + 0.6} rx={hasIris ? 1.8 : 3} ry={hasIris ? 2.6 : 3.5} fill={STROKE} />
+        {/* highlight */}
+        <circle cx={cx - 7} cy={cy - 1.6} r={1.1} fill="#FFFFFF" />
+        {sparkle && <circle cx={cx - 9.3} cy={cy + 1.4} r={0.6} fill="#FFFFFF" />}
       </g>
     )
   })()
@@ -110,11 +121,13 @@ function Eyes({
     }
     return (
       <g>
-        <ellipse cx={cx + 8} cy={cy} rx={3} ry={3.5} fill={STROKE} />
-        <circle cx={cx + 9} cy={cy - 1.2} r={1} fill="#FFFFFF" />
-        {sparkle && (
-          <circle cx={cx + 7} cy={cy + 1} r={0.6} fill="#FFFFFF" />
+        <ellipse cx={cx + 8} cy={cy} rx={4.2} ry={5} fill="#FFFFFF" stroke={STROKE} strokeWidth={0.9} />
+        {hasIris && (
+          <ellipse cx={cx + 8} cy={cy + 0.4} rx={3.2} ry={4} fill={iris} />
         )}
+        <ellipse cx={cx + 8} cy={cy + 0.6} rx={hasIris ? 1.8 : 3} ry={hasIris ? 2.6 : 3.5} fill={STROKE} />
+        <circle cx={cx + 9} cy={cy - 1.6} r={1.1} fill="#FFFFFF" />
+        {sparkle && <circle cx={cx + 6.7} cy={cy + 1.4} r={0.6} fill="#FFFFFF" />}
       </g>
     )
   })()
@@ -241,7 +254,11 @@ export function Bunny({
   shades,
   crown,
   flip,
+  eyeColor = '#8E6BE0', // Judy's signature violet
 }: HeadProps) {
+  // Judy-grey fur with pink inner-ear accents (Zootopia palette).
+  const FUR = '#B7B8BD'
+  const INNER = '#F5B7AE'
   return wrap(
     cx,
     cy,
@@ -249,23 +266,35 @@ export function Bunny({
     tilt,
     !!flip,
     <g>
-      {/* ears */}
-      <ellipse cx={cx - 12} cy={cy - 34} rx={6} ry={20} fill="#FCE6E0" stroke={STROKE} strokeWidth={1.2} />
-      <ellipse cx={cx + 12} cy={cy - 34} rx={6} ry={20} fill="#FCE6E0" stroke={STROKE} strokeWidth={1.2} />
-      <ellipse cx={cx - 12} cy={cy - 32} rx={3} ry={14} fill="#F5B2AA" />
-      <ellipse cx={cx + 12} cy={cy - 32} rx={3} ry={14} fill="#F5B2AA" />
+      {/* long tall ears */}
+      <ellipse cx={cx - 13} cy={cy - 36} rx={6.5} ry={23} fill={FUR} stroke={STROKE} strokeWidth={1.2} />
+      <ellipse cx={cx + 13} cy={cy - 36} rx={6.5} ry={23} fill={FUR} stroke={STROKE} strokeWidth={1.2} />
+      <ellipse cx={cx - 13} cy={cy - 34} rx={3} ry={16} fill={INNER} />
+      <ellipse cx={cx + 13} cy={cy - 34} rx={3} ry={16} fill={INNER} />
       {/* head */}
-      <ellipse cx={cx} cy={cy} rx={22} ry={20} fill="#FCE6E0" stroke={STROKE} strokeWidth={1.4} />
+      <ellipse cx={cx} cy={cy} rx={22} ry={20} fill={FUR} stroke={STROKE} strokeWidth={1.4} />
+      {/* cheek tufts — Judy's subtle face contour */}
+      <ellipse cx={cx - 18} cy={cy + 4} rx={6} ry={5} fill="#D1D2D6" opacity={0.6} />
+      <ellipse cx={cx + 18} cy={cy + 4} rx={6} ry={5} fill="#D1D2D6" opacity={0.6} />
+      {/* cream muzzle area */}
+      <ellipse cx={cx} cy={cy + 7} rx={11} ry={7} fill="#F6F3EE" />
       {crown && <Crown cx={cx} cy={cy - 22} />}
-      <Eyes cx={cx} cy={cy - 2} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
-      {/* nose */}
+      <Eyes cx={cx} cy={cy - 2} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
+      {/* pink nose (triangular — Judy signature) */}
       <path
-        d={`M${cx - 2} ${cy + 6} Q ${cx} ${cy + 9} ${cx + 2} ${cy + 6} Z`}
+        d={`M${cx - 3} ${cy + 5} L ${cx} ${cy + 9} L ${cx + 3} ${cy + 5} Z`}
         fill="#E89B9B"
         stroke={STROKE}
-        strokeWidth={0.8}
+        strokeWidth={1}
+        strokeLinejoin="round"
       />
-      <Mouth cx={cx} cy={cy + 10} open={mouthOpen} kiss={kissMouth} />
+      {/* philtrum line */}
+      <path d={`M${cx} ${cy + 9} L ${cx} ${cy + 11.5}`} stroke={STROKE} strokeWidth={1} strokeLinecap="round" />
+      <Mouth cx={cx} cy={cy + 12} open={mouthOpen} kiss={kissMouth} />
+      {/* front teeth (tiny, shows when mouth isn't open) */}
+      {!mouthOpen && !kissMouth && (
+        <rect x={cx - 1.8} y={cy + 11.5} width={3.6} height={3} rx={0.6} fill="#FFFFFF" stroke={STROKE} strokeWidth={0.6} />
+      )}
       <Blush cx={cx} cy={cy + 2} />
     </g>,
   )
@@ -285,7 +314,10 @@ export function Fox({
   shades,
   crown,
   flip,
+  eyeColor = '#4A9D6E', // Nick's signature emerald green
 }: HeadProps) {
+  const FUR = '#D8722E'
+  const LIGHT = '#F4D1A8'
   return wrap(
     cx,
     cy,
@@ -293,37 +325,55 @@ export function Fox({
     tilt,
     !!flip,
     <g>
-      {/* ears */}
+      {/* ears with black tips (Nick signature) */}
       <path
         d={`M${cx - 22} ${cy - 10} L ${cx - 15} ${cy - 32} L ${cx - 6} ${cy - 15} Z`}
-        fill="#E8944A"
+        fill={FUR}
         stroke={STROKE}
         strokeWidth={1.2}
         strokeLinejoin="round"
       />
       <path
         d={`M${cx + 22} ${cy - 10} L ${cx + 15} ${cy - 32} L ${cx + 6} ${cy - 15} Z`}
-        fill="#E8944A"
+        fill={FUR}
         stroke={STROKE}
         strokeWidth={1.2}
         strokeLinejoin="round"
       />
+      {/* black ear tips */}
+      <path d={`M${cx - 17} ${cy - 24} L ${cx - 15} ${cy - 32} L ${cx - 11} ${cy - 24} Z`} fill="#2A1F1A" />
+      <path d={`M${cx + 17} ${cy - 24} L ${cx + 15} ${cy - 32} L ${cx + 11} ${cy - 24} Z`} fill="#2A1F1A" />
+      {/* inner ear pink */}
+      <path d={`M${cx - 18} ${cy - 14} L ${cx - 15} ${cy - 23} L ${cx - 11} ${cy - 15} Z`} fill="#F5B7AE" />
+      <path d={`M${cx + 18} ${cy - 14} L ${cx + 15} ${cy - 23} L ${cx + 11} ${cy - 15} Z`} fill="#F5B7AE" />
+      {/* head — angular fox shape */}
       <path
-        d={`M${cx - 19} ${cy - 13} L ${cx - 15} ${cy - 26} L ${cx - 10} ${cy - 15} Z`}
-        fill="#FFE9D1"
+        d={`M${cx - 22} ${cy - 2}
+            Q ${cx - 22} ${cy - 18} ${cx - 14} ${cy - 20}
+            Q ${cx} ${cy - 22} ${cx + 14} ${cy - 20}
+            Q ${cx + 22} ${cy - 18} ${cx + 22} ${cy - 2}
+            Q ${cx + 20} ${cy + 16} ${cx} ${cy + 17}
+            Q ${cx - 20} ${cy + 16} ${cx - 22} ${cy - 2} Z`}
+        fill={FUR}
+        stroke={STROKE}
+        strokeWidth={1.4}
+        strokeLinejoin="round"
       />
+      {/* cream muzzle extending down — sly fox snout */}
       <path
-        d={`M${cx + 19} ${cy - 13} L ${cx + 15} ${cy - 26} L ${cx + 10} ${cy - 15} Z`}
-        fill="#FFE9D1"
+        d={`M${cx - 12} ${cy + 2}
+            Q ${cx - 10} ${cy + 14} ${cx} ${cy + 15}
+            Q ${cx + 10} ${cy + 14} ${cx + 12} ${cy + 2}
+            Q ${cx + 8} ${cy + 6} ${cx} ${cy + 5}
+            Q ${cx - 8} ${cy + 6} ${cx - 12} ${cy + 2} Z`}
+        fill={LIGHT}
+        stroke={STROKE}
+        strokeWidth={0.9}
       />
-      {/* head */}
-      <ellipse cx={cx} cy={cy} rx={22} ry={19} fill="#E8944A" stroke={STROKE} strokeWidth={1.4} />
-      {/* white muzzle */}
-      <ellipse cx={cx} cy={cy + 5} rx={16} ry={12} fill="#FFE9D1" />
       {crown && <Crown cx={cx} cy={cy - 22} />}
-      <Eyes cx={cx} cy={cy - 4} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
-      {/* nose */}
-      <ellipse cx={cx} cy={cy + 6} rx={2.5} ry={1.8} fill={STROKE} />
+      <Eyes cx={cx} cy={cy - 4} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
+      {/* black button nose */}
+      <ellipse cx={cx} cy={cy + 6} rx={2.8} ry={2.1} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 11} open={mouthOpen} kiss={kissMouth} />
     </g>,
   )
@@ -343,6 +393,7 @@ export function Panda({
   shades,
   crown,
   flip,
+  eyeColor,
 }: HeadProps) {
   return wrap(
     cx,
@@ -360,7 +411,7 @@ export function Panda({
       {/* eye patches */}
       <ellipse cx={cx - 9} cy={cy - 3} rx={6.5} ry={7} fill="#2C2C2C" transform={`rotate(-15 ${cx - 9} ${cy - 3})`} />
       <ellipse cx={cx + 9} cy={cy - 3} rx={6.5} ry={7} fill="#2C2C2C" transform={`rotate(15 ${cx + 9} ${cy - 3})`} />
-      <Eyes cx={cx} cy={cy - 2} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy - 2} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       {/* nose */}
       <ellipse cx={cx} cy={cy + 7} rx={2.5} ry={1.8} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 11} open={mouthOpen} kiss={kissMouth} />
@@ -383,6 +434,7 @@ export function Tiger({
   shades,
   crown,
   flip,
+  eyeColor = '#D4A24C',
 }: HeadProps) {
   return wrap(
     cx,
@@ -406,7 +458,7 @@ export function Tiger({
       {/* muzzle */}
       <ellipse cx={cx} cy={cy + 5} rx={14} ry={10} fill="#FFE4C8" />
       {crown && <Crown cx={cx} cy={cy - 22} />}
-      <Eyes cx={cx} cy={cy - 3} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy - 3} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       <ellipse cx={cx} cy={cy + 5} rx={2.5} ry={1.8} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 10} open={mouthOpen} kiss={kissMouth} />
     </g>,
@@ -427,6 +479,7 @@ export function Sheep({
   shades,
   crown,
   flip,
+  eyeColor = '#8C6F4E',
 }: HeadProps) {
   return wrap(
     cx,
@@ -459,7 +512,7 @@ export function Sheep({
       <ellipse cx={cx - 24} cy={cy - 2} rx={6} ry={4} fill="#E6BFA5" stroke={STROKE} strokeWidth={1} transform={`rotate(-20 ${cx - 24} ${cy - 2})`} />
       <ellipse cx={cx + 24} cy={cy - 2} rx={6} ry={4} fill="#E6BFA5" stroke={STROKE} strokeWidth={1} transform={`rotate(20 ${cx + 24} ${cy - 2})`} />
       {crown && <Crown cx={cx} cy={cy - 22} />}
-      <Eyes cx={cx} cy={cy - 1} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy - 1} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       <ellipse cx={cx} cy={cy + 8} rx={2} ry={1.3} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 12} open={mouthOpen} kiss={kissMouth} />
       <Blush cx={cx} cy={cy + 4} color="#E89B9B" />
@@ -481,6 +534,7 @@ export function Wolf({
   shades,
   crown,
   flip,
+  eyeColor = '#D4A24C',
 }: HeadProps) {
   return wrap(
     cx,
@@ -511,7 +565,7 @@ export function Wolf({
       {/* light chest / muzzle area */}
       <ellipse cx={cx} cy={cy + 6} rx={14} ry={11} fill="#C5C7CB" />
       {crown && <Crown cx={cx} cy={cy - 22} />}
-      <Eyes cx={cx} cy={cy - 4} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy - 4} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       <ellipse cx={cx} cy={cy + 6} rx={2.5} ry={1.8} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 11} open={mouthOpen} kiss={kissMouth} />
     </g>,
@@ -532,6 +586,7 @@ export function Sloth({
   shades,
   crown,
   flip,
+  eyeColor = '#6B4A2A',
 }: HeadProps) {
   return wrap(
     cx,
@@ -548,7 +603,7 @@ export function Sloth({
       <ellipse cx={cx - 8} cy={cy - 1} rx={5} ry={6} fill="#5A3E20" />
       <ellipse cx={cx + 8} cy={cy - 1} rx={5} ry={6} fill="#5A3E20" />
       {crown && <Crown cx={cx} cy={cy - 24} />}
-      <Eyes cx={cx} cy={cy} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       <ellipse cx={cx} cy={cy + 7} rx={2.5} ry={1.8} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 11} open={mouthOpen} kiss={kissMouth} />
     </g>,
@@ -569,6 +624,7 @@ export function Cheetah({
   shades,
   crown,
   flip,
+  eyeColor = '#4D8259',
 }: HeadProps) {
   return wrap(
     cx,
@@ -596,7 +652,7 @@ export function Cheetah({
       <path d={`M${cx - 7} ${cy + 2} L ${cx - 4} ${cy + 10}`} stroke={STROKE} strokeWidth={1.5} strokeLinecap="round" />
       <path d={`M${cx + 7} ${cy + 2} L ${cx + 4} ${cy + 10}`} stroke={STROKE} strokeWidth={1.5} strokeLinecap="round" />
       {crown && <Crown cx={cx} cy={cy - 22} />}
-      <Eyes cx={cx} cy={cy - 3} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy - 3} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       <ellipse cx={cx} cy={cy + 5} rx={2.2} ry={1.6} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 10} open={mouthOpen} kiss={kissMouth} />
     </g>,
@@ -617,6 +673,7 @@ export function Lion({
   shades,
   crown,
   flip,
+  eyeColor = '#B8761F',
 }: HeadProps) {
   return wrap(
     cx,
@@ -651,7 +708,7 @@ export function Lion({
       {/* muzzle */}
       <ellipse cx={cx} cy={cy + 5} rx={13} ry={10} fill="#F4CE92" />
       {crown && <Crown cx={cx} cy={cy - 20} />}
-      <Eyes cx={cx} cy={cy - 3} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy - 3} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       <ellipse cx={cx} cy={cy + 5} rx={2.5} ry={1.8} fill={STROKE} />
       <Mouth cx={cx} cy={cy + 10} open={mouthOpen} kiss={kissMouth} />
     </g>,
@@ -672,6 +729,7 @@ export function Elephant({
   shades,
   crown,
   flip,
+  eyeColor = '#4A6B8A',
 }: HeadProps) {
   return wrap(
     cx,
@@ -697,7 +755,7 @@ export function Elephant({
       />
       <path d={`M${cx - 2} ${cy + 15} L ${cx + 6} ${cy + 20}`} stroke={STROKE} strokeWidth={0.8} opacity={0.5} fill="none" />
       {crown && <Crown cx={cx} cy={cy - 22} />}
-      <Eyes cx={cx} cy={cy - 4} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} />
+      <Eyes cx={cx} cy={cy - 4} winkLeft={winkLeft} winkRight={winkRight} closed={closedEyes} sparkle={sparkleEyes} shades={shades} iris={eyeColor} />
       <Mouth cx={cx} cy={cy + 5} open={mouthOpen} kiss={kissMouth} />
     </g>,
   )

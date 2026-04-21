@@ -7,13 +7,16 @@ import {
   RefreshCw,
   Sparkles,
   Share2,
+  User,
+  Users,
+  Shuffle as ShuffleIcon,
 } from 'lucide-react'
 import { CameraStage } from './camera-stage'
 import { Controls } from './controls'
 import { PhotoStrip } from './photo-strip'
 import { PosePanel } from './pose-panel'
 import { FILTERS, type FilterId } from './filters'
-import { buildPoseSequence, type Pose } from './poses'
+import { buildPoseSequence, type Pose, type PoseMode } from './poses'
 import { cn } from '@/lib/utils'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error' | 'capturing'
@@ -40,9 +43,12 @@ export function Photobooth() {
   const [facingMode, setFacingMode] = useState<FacingMode>('user')
   const [canFlipCamera, setCanFlipCamera] = useState(false)
 
+  // Mode foto — user memilih sendiri/couple/campur SEBELUM memotret
+  const [poseMode, setPoseMode] = useState<PoseMode>('mix')
+
   // Pose sequence — diacak & di-loop sebanyak shotCount
   const [poseSequence, setPoseSequence] = useState<Pose[]>(() =>
-    buildPoseSequence(4),
+    buildPoseSequence(4, 'mix'),
   )
 
   // Capture state
@@ -54,13 +60,10 @@ export function Photobooth() {
   const filterCss =
     FILTERS.find((f) => f.id === filterId)?.css ?? 'none'
 
-  // Keep pose-sequence length in sync with shotCount
+  // Keep pose-sequence in sync with shotCount & mode
   useEffect(() => {
-    setPoseSequence((prev) => {
-      if (prev.length === shotCount) return prev
-      return buildPoseSequence(shotCount)
-    })
-  }, [shotCount])
+    setPoseSequence(buildPoseSequence(shotCount, poseMode))
+  }, [shotCount, poseMode])
 
   // Detect multi-camera (mobile usually has front+back)
   useEffect(() => {
@@ -199,12 +202,12 @@ export function Photobooth() {
   const resetPhotos = useCallback(() => {
     setPhotos([])
     // Acak lagi supaya sesi berikutnya pose-nya beda
-    setPoseSequence(buildPoseSequence(shotCount))
-  }, [shotCount])
+    setPoseSequence(buildPoseSequence(shotCount, poseMode))
+  }, [shotCount, poseMode])
 
   const reshufflePoses = useCallback(() => {
-    setPoseSequence(buildPoseSequence(shotCount))
-  }, [shotCount])
+    setPoseSequence(buildPoseSequence(shotCount, poseMode))
+  }, [shotCount, poseMode])
 
   const handleDownload = useCallback(() => {
     const canvas = stripCanvasRef.current
@@ -276,6 +279,13 @@ export function Photobooth() {
           />
         ) : (
           <>
+            {/* Mode picker — pilih Solo / Couple / Campur sebelum mulai */}
+            <ModePicker
+              mode={poseMode}
+              onChange={setPoseMode}
+              disabled={busy}
+            />
+
             {/* Pose example panel — muncul DI ATAS kamera */}
             <PosePanel
               pose={activePose}
@@ -465,6 +475,96 @@ function ResultView({
             Ambil Lagi
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* --------------- Mode picker --------------- */
+
+function ModePicker({
+  mode,
+  onChange,
+  disabled,
+}: {
+  mode: PoseMode
+  onChange: (m: PoseMode) => void
+  disabled?: boolean
+}) {
+  const options: {
+    id: PoseMode
+    label: string
+    hint: string
+    icon: React.ReactNode
+  }[] = [
+    {
+      id: 'solo',
+      label: 'Solo',
+      hint: '10 pose sendiri',
+      icon: <User className="h-4 w-4" aria-hidden="true" />,
+    },
+    {
+      id: 'couple',
+      label: 'Couple',
+      hint: '10 pose berdua',
+      icon: <Users className="h-4 w-4" aria-hidden="true" />,
+    },
+    {
+      id: 'mix',
+      label: 'Campur',
+      hint: 'Solo + couple',
+      icon: <ShuffleIcon className="h-4 w-4" aria-hidden="true" />,
+    },
+  ]
+
+  return (
+    <div
+      className="rounded-2xl border bg-card p-3 shadow-sm"
+      role="radiogroup"
+      aria-label="Mode pose foto"
+    >
+      <div className="mb-2 flex items-center justify-between px-1">
+        <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+          Mode Foto
+        </p>
+        <span className="text-[10px] text-muted-foreground">
+          Pilih sebelum mulai
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {options.map((opt) => {
+          const active = mode === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(opt.id)}
+              disabled={disabled}
+              className={cn(
+                'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-xs font-semibold transition',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                active
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                  : 'border-border bg-background hover:border-foreground/30',
+              )}
+            >
+              <span className="flex items-center gap-1.5">
+                {opt.icon}
+                <span>{opt.label}</span>
+              </span>
+              <span
+                className={cn(
+                  'text-[10px] font-normal',
+                  active ? 'text-primary-foreground/80' : 'text-muted-foreground',
+                )}
+              >
+                {opt.hint}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
