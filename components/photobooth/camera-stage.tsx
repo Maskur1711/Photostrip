@@ -1,8 +1,10 @@
 'use client'
 
 import { forwardRef } from 'react'
+import Image from 'next/image'
 import { Camera, CameraOff, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { Character } from './characters'
 
 interface CameraStageProps {
   status: 'idle' | 'loading' | 'ready' | 'error' | 'capturing'
@@ -13,6 +15,7 @@ interface CameraStageProps {
   flash: boolean
   currentShot: number
   totalShots: number
+  character: Character
   onRequestCamera: () => void
 }
 
@@ -27,10 +30,13 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
       flash,
       currentShot,
       totalShots,
+      character,
       onRequestCamera,
     },
     ref,
   ) {
+    const showCharacterPIP = status === 'ready' || status === 'capturing'
+
     return (
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-foreground/95 shadow-xl ring-1 ring-border">
         {/* Video feed */}
@@ -106,6 +112,32 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
             >
               Coba lagi
             </button>
+          </div>
+        )}
+
+        {/* Character PIP (picture-in-picture) — contoh pose live di pojok */}
+        {showCharacterPIP && (
+          <div className="pointer-events-none absolute right-4 bottom-4 flex items-end gap-2">
+            <div
+              className="relative h-24 w-24 overflow-hidden rounded-2xl shadow-2xl ring-2 ring-background/80 sm:h-28 sm:w-28"
+              style={{ backgroundColor: character.accent }}
+            >
+              <Image
+                src={character.image || '/placeholder.svg'}
+                alt=""
+                fill
+                sizes="112px"
+                className="object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-foreground/80 to-transparent px-2 py-1">
+                <p className="text-[10px] font-semibold tracking-wide text-background uppercase">
+                  Tirukan
+                </p>
+                <p className="font-serif text-sm text-background">
+                  {character.name}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 

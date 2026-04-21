@@ -1,14 +1,18 @@
 'use client'
 
+import Image from 'next/image'
 import { Check, FlipHorizontal2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FILTERS, FRAME_COLORS, type FilterId } from './filters'
+import { CHARACTERS, type CharacterId } from './characters'
 
 interface ControlsProps {
   selectedFilter: FilterId
   onFilterChange: (id: FilterId) => void
   selectedFrame: string
   onFrameChange: (id: string) => void
+  selectedCharacter: CharacterId
+  onCharacterChange: (id: CharacterId) => void
   shotCount: number
   onShotCountChange: (n: number) => void
   countdownSeconds: number
@@ -23,6 +27,8 @@ export function Controls({
   onFilterChange,
   selectedFrame,
   onFrameChange,
+  selectedCharacter,
+  onCharacterChange,
   shotCount,
   onShotCountChange,
   countdownSeconds,
@@ -33,6 +39,49 @@ export function Controls({
 }: ControlsProps) {
   return (
     <div className="space-y-6">
+      {/* Character picker */}
+      <section>
+        <SectionHeader title="Karakter Pose" />
+        <div className="grid grid-cols-3 gap-2">
+          {CHARACTERS.map((c) => {
+            const active = c.id === selectedCharacter
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onCharacterChange(c.id)}
+                disabled={disabled}
+                aria-pressed={active}
+                aria-label={`${c.name} si ${c.species}`}
+                className={cn(
+                  'group relative aspect-square overflow-hidden rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-50',
+                  active
+                    ? 'border-primary ring-2 ring-primary/40'
+                    : 'border-border hover:border-foreground/30',
+                )}
+                style={{ backgroundColor: c.accent }}
+              >
+                <Image
+                  src={c.image || '/placeholder.svg'}
+                  alt=""
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
+                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-foreground/85 to-transparent px-1.5 py-1 text-left text-[10px] font-semibold text-background">
+                  {c.name}
+                </span>
+                {active && (
+                  <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
+                    <Check className="h-3 w-3" aria-hidden="true" />
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
       {/* Filters */}
       <section>
         <SectionHeader title="Filter" />

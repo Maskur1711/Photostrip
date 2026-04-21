@@ -11,7 +11,9 @@ import {
 import { CameraStage } from './camera-stage'
 import { Controls } from './controls'
 import { PhotoStrip } from './photo-strip'
+import { PosePanel } from './pose-panel'
 import { FILTERS, type FilterId } from './filters'
+import { CHARACTERS, type CharacterId } from './characters'
 import { cn } from '@/lib/utils'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error' | 'capturing'
@@ -27,11 +29,15 @@ export function Photobooth() {
   // Settings
   const [filterId, setFilterId] = useState<FilterId>('none')
   const [frameColor, setFrameColor] = useState('cream')
+  const [characterId, setCharacterId] = useState<CharacterId>('bunny')
   const [shotCount, setShotCount] = useState(4)
   const [countdownSeconds, setCountdownSeconds] = useState(3)
   const [mirror, setMirror] = useState(true)
   const [caption, setCaption] = useState('Snapbooth')
   const [showDate, setShowDate] = useState(true)
+
+  const character =
+    CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0]
 
   // Capture state
   const [countdown, setCountdown] = useState<number | null>(null)
@@ -195,6 +201,7 @@ export function Photobooth() {
             frameColor={frameColor}
             caption={caption}
             showDate={showDate}
+            character={character}
             onCanvasReady={(c) => (stripCanvasRef.current = c)}
             onRetake={() => {
               resetPhotos()
@@ -206,6 +213,9 @@ export function Photobooth() {
           />
         ) : (
           <>
+            {/* Pose example panel — muncul DI ATAS kamera */}
+            <PosePanel character={character} active={status === 'capturing'} />
+
             <CameraStage
               ref={videoRef}
               status={status}
@@ -216,6 +226,7 @@ export function Photobooth() {
               flash={flash}
               currentShot={currentShot}
               totalShots={shotCount}
+              character={character}
               onRequestCamera={startCamera}
             />
 
@@ -271,6 +282,8 @@ export function Photobooth() {
           onFilterChange={setFilterId}
           selectedFrame={frameColor}
           onFrameChange={setFrameColor}
+          selectedCharacter={characterId}
+          onCharacterChange={setCharacterId}
           shotCount={shotCount}
           onShotCountChange={setShotCount}
           countdownSeconds={countdownSeconds}
@@ -289,6 +302,7 @@ function ResultView({
   frameColor,
   caption,
   showDate,
+  character,
   onCanvasReady,
   onRetake,
   onDownload,
@@ -300,6 +314,7 @@ function ResultView({
   frameColor: string
   caption: string
   showDate: boolean
+  character: (typeof CHARACTERS)[number]
   onCanvasReady: (c: HTMLCanvasElement) => void
   onRetake: () => void
   onDownload: () => void
@@ -315,6 +330,7 @@ function ResultView({
           frameColorId={frameColor}
           caption={caption}
           showDate={showDate}
+          character={character}
           onCanvasReady={onCanvasReady}
         />
       </div>
