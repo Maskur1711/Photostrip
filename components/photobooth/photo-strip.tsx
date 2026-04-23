@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import {
   buildSlots,
   drawFooter,
@@ -35,10 +36,24 @@ export function PhotoStrip({
   onCanvasReady,
 }: PhotoStripProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const onReadyRef = useRef(onCanvasReady)
+  onReadyRef.current = onCanvasReady
+  const [isRendering, setIsRendering] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
+    const finish = () => {
+      if (!cancelled) {
+        setIsRendering(false)
+      }
+    }
+
     const canvas = canvasRef.current
-    if (!canvas) return
+    if (!canvas) {
+      return
+    }
+
+    setIsRendering(true)
 
     const frame = FRAME_STYLES.find((f) => f.id === frameColorId) ?? FRAME_STYLES[0]
     const sticker = STICKER_THEMES.find((s) => s.id === stickerThemeId) ?? STICKER_THEMES[0]
@@ -59,12 +74,14 @@ export function PhotoStrip({
     canvas.height = HEIGHT
 
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    if (!ctx) {
+      finish()
+      return
+    }
     const context = ctx
     const readyCanvas = canvas
 
     drawFrameBackground(context, frame.kind, WIDTH, HEIGHT, frameBg)
-    continueRender()
 
     function continueRender() {
       const slots = buildSlots(
@@ -94,10 +111,14 @@ export function PhotoStrip({
         const img = new Image()
         img.crossOrigin = 'anonymous'
         img.onload = () => {
+          if (cancelled) return
           imgs[idx] = img
           onOneLoaded()
         }
-        img.onerror = onOneLoaded
+        img.onerror = () => {
+          if (cancelled) return
+          onOneLoaded()
+        }
         img.src = src
       })
 
@@ -107,6 +128,7 @@ export function PhotoStrip({
       }
 
       function drawAll() {
+        if (cancelled) return
         slots.forEach((slot, idx) => {
           if (idx >= photos.length) return
           const img = imgs[idx]
@@ -133,18 +155,36 @@ export function PhotoStrip({
           color: frame.fg,
         })
         drawStickerDecorations(context, sticker.emojis, WIDTH, HEIGHT)
-        onCanvasReady?.(readyCanvas)
+        onReadyRef.current?.(readyCanvas)
+        finish()
       }
     }
+
+    continueRender()
     void poseTitles
-  }, [photos, poseTitles, frameColorId, templateId, stickerThemeId, polaroidColor, caption, showDate, onCanvasReady])
+
+    return () => {
+      cancelled = true
+    }
+  }, [photos, poseTitles, frameColorId, templateId, stickerThemeId, polaroidColor, caption, showDate])
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="h-auto w-full max-w-[360px] rounded-md shadow-2xl ring-1 ring-foreground/10"
-      aria-label="Pratinjau photo strip"
-    />
+    <div className="relative w-full max-w-full">
+      {isRendering && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/70 backdrop-blur-[2px]"
+          aria-hidden
+        >
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        className="h-auto w-full max-w-full rounded-md shadow-2xl ring-1 ring-foreground/10"
+        aria-label="Pratinjau photo strip"
+        aria-busy={isRendering}
+      />
+    </div>
   )
 }
 

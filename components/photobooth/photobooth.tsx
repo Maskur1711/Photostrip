@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  WandSparkles,
   Camera,
   Download,
   RefreshCw,
@@ -21,16 +22,20 @@ import { PosePanel } from './pose-panel'
 import { ResultCustomizer } from './result-customizer'
 import { buildPoseSequence, type Pose, type PoseMode } from './poses'
 import { cn } from '@/lib/utils'
+import { toast } from '@/hooks/use-toast'
 
 export function Photobooth() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const stripCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
+  const handleStripCanvasReady = useCallback((canvas: HTMLCanvasElement) => {
+    stripCanvasRef.current = canvas
+  }, [])
+
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
 
-  // Settings
   const [frameColor, setFrameColor] = useState('classic-cream')
   const [polaroidColor, setPolaroidColor] = useState('#ffffff')
   const [templateId, setTemplateId] = useState('classic-strip')
@@ -40,32 +45,29 @@ export function Photobooth() {
   const [mirror, setMirror] = useState(true)
   const [caption, setCaption] = useState('Snapbooth')
   const [showDate, setShowDate] = useState(true)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiTextResult, setAiTextResult] = useState<string | null>(null)
 
-  // Mobile: facing camera
   const [facingMode, setFacingMode] = useState<FacingMode>('user')
   const [canFlipCamera, setCanFlipCamera] = useState(false)
 
-  // Mode foto — user memilih sendiri/couple/campur SEBELUM memotret
   const [poseMode, setPoseMode] = useState<PoseMode>('mix')
 
-  // Pose sequence — diacak & di-loop sebanyak shotCount
   const [poseSequence, setPoseSequence] = useState<Pose[]>(() =>
     buildPoseSequence(4, 'mix', false),
   )
 
-  // Capture state
   const [countdown, setCountdown] = useState<number | null>(null)
   const [flash, setFlash] = useState(false)
   const [currentShot, setCurrentShot] = useState(0)
   const [photos, setPhotos] = useState<string[]>([])
   const [showResultView, setShowResultView] = useState(false)
 
-  // Keep pose-sequence in sync with shotCount & mode
   useEffect(() => {
     setPoseSequence(buildPoseSequence(shotCount, poseMode))
   }, [shotCount, poseMode])
 
-  // Detect multi-camera (mobile usually has front+back)
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
       return
@@ -84,7 +86,6 @@ export function Photobooth() {
     streamRef.current = null
   }, [])
 
-  // Start camera with given facingMode
   const startCamera = useCallback(
     async (mode: FacingMode = facingMode) => {
       setStatus('loading')
@@ -96,8 +97,6 @@ export function Photobooth() {
         stopStream()
         let stream: MediaStream | null = null
 
-        // Safari (khususnya macOS) kadang gagal pada constraint detail.
-        // Gunakan fallback bertahap agar kamera tetap bisa terbuka.
         const primaryConstraints: MediaStreamConstraints = supportsFacingModeConstraint()
           ? {
               video: {
@@ -118,7 +117,6 @@ export function Photobooth() {
         try {
           stream = await navigator.mediaDevices.getUserMedia(primaryConstraints)
         } catch {
-          // Fallback paling kompatibel lintas browser
           stream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: false,
@@ -131,11 +129,9 @@ export function Photobooth() {
         streamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
-          // iOS Safari needs explicit play after srcObject
           await videoRef.current.play().catch(() => {})
         }
         setFacingMode(mode)
-        // Auto-mirror only for selfie (user) cam
         setMirror(mode === 'user')
         setStatus('ready')
       } catch (err) {
@@ -157,7 +153,6 @@ export function Photobooth() {
     void startCamera(next)
   }, [facingMode, startCamera])
 
-  // Stop camera on unmount
   useEffect(() => {
     return () => {
       stopStream()
@@ -176,7 +171,6 @@ export function Photobooth() {
     void video.play().catch(() => {})
   }, [photos.length, shotCount])
 
-  // Capture single photo from video
   const capturePhoto = useCallback((): string | null => {
     const video = videoRef.current
     if (!video || video.videoWidth === 0) return null
@@ -197,7 +191,6 @@ export function Photobooth() {
     return canvas.toDataURL('image/jpeg', 0.92)
   }, [mirror])
 
-  // Capture sequence
   const runCaptureSequence = useCallback(async () => {
     if (status !== 'ready') return
 
@@ -209,16 +202,14 @@ export function Photobooth() {
     for (let i = 0; i < shotCount; i += 1) {
       setCurrentShot(i)
 
-      // countdown
       for (let c = countdownSeconds; c > 0; c -= 1) {
         setCountdown(c)
         await wait(1000)
       }
-      setCountdown(0) // "Smile!"
+      setCountdown(0)
       await wait(400)
       setCountdown(null)
 
-      // flash + capture
       setFlash(true)
       const shot = capturePhoto()
       if (shot) {
@@ -228,7 +219,6 @@ export function Photobooth() {
       await wait(450)
       setFlash(false)
 
-      // brief pause between shots
       if (i < shotCount - 1) await wait(700)
     }
 
@@ -239,7 +229,7 @@ export function Photobooth() {
   const resetPhotos = useCallback(() => {
     setPhotos([])
     setShowResultView(false)
-    // Acak lagi supaya sesi berikutnya pose-nya beda
+    setAiTextResult(null)
     setPoseSequence(buildPoseSequence(shotCount, poseMode))
   }, [shotCount, poseMode])
 
@@ -282,26 +272,68 @@ export function Photobooth() {
             title: 'Snapbooth',
             text: 'Photo strip dari Snapbooth',
           })
-        } catch {
-          // user cancelled
-        }
+        } catch {}
       } else {
         handleDownload()
       }
     }, 'image/png')
   }, [handleDownload])
 
+  const handlePoseRecommendations = useCallback(async () => {
+    if (aiGenerating) return
+    const canvas = stripCanvasRef.current
+    if (!canvas) {
+      toast({
+        variant: 'destructive',
+        title: 'Gagal',
+        description: 'Pratinjau photo strip belum siap. Tunggu sebentar, lalu coba lagi.',
+      })
+      return
+    }
+
+    setAiGenerating(true)
+
+    try {
+      const imageDataUrl = canvas.toDataURL('image/png')
+      const response = await fetch('/api/ai/pose-recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageDataUrl,
+          context: aiPrompt,
+        }),
+      })
+
+      const data = (await response.json()) as { text?: string; error?: string }
+      if (!response.ok || !data.text) {
+        toast({
+          variant: 'destructive',
+          title: 'Generate gagal',
+          description: 'Terjadi kesalahan. Silakan coba lagi.',
+        })
+        return
+      }
+
+      setAiTextResult(data.text)
+      toast({
+        title: 'Generate berhasil',
+        description: 'Rekomendasi pose sudah ditampilkan.',
+      })
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Generate gagal',
+        description: 'Terjadi kesalahan. Silakan coba lagi.',
+      })
+    } finally {
+      setAiGenerating(false)
+    }
+  }, [aiGenerating, aiPrompt])
+
   const hasCaptureResult = photos.length === shotCount && photos.length > 0
   const hasResult = hasCaptureResult && showResultView
   const busy = status === 'capturing'
 
-  useEffect(() => {
-    if (shotCount > 4 && templateId === 'grid-2x2') {
-      setTemplateId('classic-strip')
-    }
-  }, [shotCount, templateId])
-
-  // Pose yang sedang ditampilkan di panel & PIP
   const activePose = useMemo(() => {
     const idx = Math.min(currentShot, poseSequence.length - 1)
     return poseSequence[idx] ?? poseSequence[0]
@@ -324,7 +356,6 @@ export function Photobooth() {
         'lg:grid-cols-[minmax(0,1fr)_460px] xl:grid-cols-[minmax(0,1fr)_520px]',
       )}
     >
-      {/* LEFT: Camera / Strip */}
       <div className="space-y-4">
         {hasResult ? (
           <ResultView
@@ -336,18 +367,22 @@ export function Photobooth() {
             polaroidColor={polaroidColor}
             caption={caption}
             showDate={showDate}
-            onCanvasReady={(c) => (stripCanvasRef.current = c)}
+            onCanvasReady={handleStripCanvasReady}
             onRetake={() => {
               resetPhotos()
             }}
             onDownload={handleDownload}
             onShare={handleShare}
+            aiPrompt={aiPrompt}
+            onAiPromptChange={setAiPrompt}
+            onPoseRecommendations={handlePoseRecommendations}
+            aiGenerating={aiGenerating}
+            aiTextResult={aiTextResult}
             onCaptionChange={setCaption}
             onShowDateChange={setShowDate}
           />
         ) : (
           <>
-            {/* Mode picker — pilih Solo / Couple / Campur sebelum mulai */}
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
               <ModePicker
                 mode={poseMode}
@@ -355,7 +390,6 @@ export function Photobooth() {
                 disabled={busy}
               />
 
-              {/* Pose example panel */}
               <PosePanel
                 pose={activePose}
                 active={status === 'capturing'}
@@ -381,7 +415,6 @@ export function Photobooth() {
               />
             </div>
 
-            {/* Capture CTA */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-sm">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -431,7 +464,6 @@ export function Photobooth() {
         )}
       </div>
 
-      {/* RIGHT: Controls */}
       {hasResult ? (
         <ResultCustomizer
           photos={photos}
@@ -474,6 +506,36 @@ export function Photobooth() {
   )
 }
 
+function PoseRecommendationList({ text }: { text: string }) {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  return (
+    <ul className="m-0 list-none space-y-1.5 p-0 text-sm leading-relaxed">
+      {lines.map((line, index) => {
+        const match = line.match(/^-\s*(.*)$/)
+        if (match) {
+          return (
+            <li key={index} className="flex gap-2">
+              <span className="mt-[0.2em] shrink-0 w-[0.6em] text-center text-muted-foreground" aria-hidden>
+                -
+              </span>
+              <span className="min-w-0 flex-1">{match[1]}</span>
+            </li>
+          )
+        }
+        return (
+          <li key={index} className="pl-0">
+            {line}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 function ResultView({
   photos,
   poseTitles,
@@ -487,6 +549,11 @@ function ResultView({
   onRetake,
   onDownload,
   onShare,
+  aiPrompt,
+  onAiPromptChange,
+  onPoseRecommendations,
+  aiGenerating,
+  aiTextResult,
   onCaptionChange,
   onShowDateChange,
 }: {
@@ -502,12 +569,17 @@ function ResultView({
   onRetake: () => void
   onDownload: () => void
   onShare: () => void
+  aiPrompt: string
+  onAiPromptChange: (prompt: string) => void
+  onPoseRecommendations: () => void
+  aiGenerating: boolean
+  aiTextResult: string | null
   onCaptionChange: (s: string) => void
   onShowDateChange: (v: boolean) => void
 }) {
   return (
-    <div className="grid gap-5 rounded-2xl border bg-card p-5 shadow-sm sm:p-6 md:grid-cols-[auto_1fr]">
-      <div className="flex justify-center md:justify-start">
+    <div className="grid gap-5 rounded-2xl border bg-card p-5 shadow-sm sm:p-6 md:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mx-auto w-full max-w-[300px] shrink-0 justify-self-center md:mx-0 md:max-w-full md:justify-self-stretch">
         <PhotoStrip
           photos={photos}
           poseTitles={poseTitles}
@@ -545,6 +617,59 @@ function ResultView({
             />
           </label>
 
+          <div className="block text-sm">
+            <span
+              className="mb-1.5 block text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+              id="ai-context-label"
+            >
+              Konteks (opsional)
+            </span>
+            <div className="relative">
+              <textarea
+                id="ai-context"
+                value={aiPrompt}
+                onChange={(e) => onAiPromptChange(e.target.value)}
+                rows={4}
+                aria-labelledby="ai-context-label"
+                className="min-h-22 w-full resize-y rounded-lg border border-input bg-background py-2.5 pl-3 pr-28 pb-11 text-sm focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
+                placeholder="Contoh: foto couple prewedding, gaya manis, 4 jepretan, ingin kelihatan natural"
+              />
+              <button
+                type="button"
+                onClick={onPoseRecommendations}
+                disabled={aiGenerating}
+                className={cn(
+                  'absolute right-4 bottom-4 z-10 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-secondary',
+                  'disabled:cursor-not-allowed disabled:opacity-60',
+                )}
+                title={
+                  aiGenerating
+                    ? 'Memproses...'
+                    : aiTextResult
+                      ? 'Buat ulang rekomendasi pose'
+                      : 'Rekomendasi pose dari AI'
+                }
+              >
+                <WandSparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  {aiGenerating
+                    ? '...'
+                    : aiTextResult
+                      ? 'Regenerate Pose'
+                      : 'Pose AI'}
+                </span>
+              </button>
+            </div>
+          </div>
+          {aiTextResult && (
+            <div className="rounded-xl border p-2">
+              <p className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                Rekomendasi pose
+              </p>
+              <PoseRecommendationList text={aiTextResult} />
+            </div>
+          )}
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -556,38 +681,36 @@ function ResultView({
           </label>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full min-w-0 grid-cols-3 gap-2">
           <button
             type="button"
             onClick={onDownload}
-            className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition hover:brightness-110"
+            className="inline-flex min-h-11 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-full bg-primary px-1.5 py-2 text-center text-[11px] font-semibold text-primary-foreground shadow-lg leading-tight transition hover:brightness-110 sm:flex-row sm:gap-1.5 sm:px-2 sm:text-sm"
           >
-            <Download className="h-4 w-4" aria-hidden="true" />
-            Download
+            <Download className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
+            <span>Download</span>
           </button>
           <button
             type="button"
             onClick={onShare}
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
+            className="inline-flex min-h-11 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-2 text-center text-[11px] font-semibold leading-tight transition hover:bg-secondary sm:flex-row sm:gap-1.5 sm:px-2 sm:text-sm"
           >
-            <Share2 className="h-4 w-4" aria-hidden="true" />
-            Bagikan
+            <Share2 className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
+            <span>Bagikan</span>
           </button>
           <button
             type="button"
             onClick={onRetake}
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
+            className="inline-flex min-h-11 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-2 text-center text-[11px] font-semibold leading-tight transition hover:bg-secondary sm:flex-row sm:gap-1.5 sm:px-2 sm:text-sm"
           >
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Ambil Lagi
+            <RefreshCw className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
+            <span className="text-balance">Ambil Lagi</span>
           </button>
         </div>
       </div>
     </div>
   )
 }
-
-/* --------------- Mode picker --------------- */
 
 function ModePicker({
   mode,
