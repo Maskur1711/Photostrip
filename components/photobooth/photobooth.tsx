@@ -12,15 +12,15 @@ import {
   Shuffle as ShuffleIcon,
 } from 'lucide-react'
 import { CameraStage } from './camera-stage'
+import { supportsFacingModeConstraint } from './composables/camera'
 import { Controls } from './controls'
+import { type FacingMode, type Status } from './entities/photobooth-types'
+import { useSelectedPhotos } from './hooks/use-selected-photos'
 import { PhotoStrip } from './photo-strip'
 import { PosePanel } from './pose-panel'
-import { FILTERS, type FilterId } from './filters'
+import { ResultCustomizer } from './result-customizer'
 import { buildPoseSequence, type Pose, type PoseMode } from './poses'
 import { cn } from '@/lib/utils'
-
-type Status = 'idle' | 'loading' | 'ready' | 'error' | 'capturing'
-type FacingMode = 'user' | 'environment'
 
 export function Photobooth() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -31,8 +31,10 @@ export function Photobooth() {
   const [error, setError] = useState<string | null>(null)
 
   // Settings
-  const [filterId, setFilterId] = useState<FilterId>('none')
-  const [frameColor, setFrameColor] = useState('cream')
+  const [frameColor, setFrameColor] = useState('classic-cream')
+  const [polaroidColor, setPolaroidColor] = useState('#ffffff')
+  const [templateId, setTemplateId] = useState('classic-strip')
+  const [stickerThemeId, setStickerThemeId] = useState('none')
   const [shotCount, setShotCount] = useState(4)
   const [countdownSeconds, setCountdownSeconds] = useState(3)
   const [mirror, setMirror] = useState(true)
@@ -48,7 +50,7 @@ export function Photobooth() {
 
   // Pose sequence — diacak & di-loop sebanyak shotCount
   const [poseSequence, setPoseSequence] = useState<Pose[]>(() =>
-    buildPoseSequence(4, 'mix'),
+    buildPoseSequence(4, 'mix', false),
   )
 
   // Capture state
@@ -56,9 +58,7 @@ export function Photobooth() {
   const [flash, setFlash] = useState(false)
   const [currentShot, setCurrentShot] = useState(0)
   const [photos, setPhotos] = useState<string[]>([])
-
-  const filterCss =
-    FILTERS.find((f) => f.id === filterId)?.css ?? 'none'
+  const [showResultView, setShowResultView] = useState(false)
 
   // Keep pose-sequence in sync with shotCount & mode
   useEffect(() => {
@@ -94,14 +94,40 @@ export function Photobooth() {
           throw new Error('Browser kamu tidak mendukung akses kamera.')
         }
         stopStream()
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: mode },
-            width: { ideal: 1280 },
-            height: { ideal: 960 },
-          },
-          audio: false,
-        })
+        let stream: MediaStream | null = null
+
+        // Safari (khususnya macOS) kadang gagal pada constraint detail.
+        // Gunakan fallback bertahap agar kamera tetap bisa terbuka.
+        const primaryConstraints: MediaStreamConstraints = supportsFacingModeConstraint()
+          ? {
+              video: {
+                facingMode: { ideal: mode },
+                width: { ideal: 1280 },
+                height: { ideal: 960 },
+              },
+              audio: false,
+            }
+          : {
+              video: {
+                width: { ideal: 1280 },
+                height: { ideal: 960 },
+              },
+              audio: false,
+            }
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(primaryConstraints)
+        } catch {
+          // Fallback paling kompatibel lintas browser
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          })
+        }
+
+        if (!stream) {
+          throw new Error('Gagal mengakses kamera.')
+        }
         streamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
@@ -138,6 +164,18 @@ export function Photobooth() {
     }
   }, [stopStream])
 
+  useEffect(() => {
+    const currentlyShowingResult = photos.length === shotCount && photos.length > 0
+    if (currentlyShowingResult) return
+    const video = videoRef.current
+    const stream = streamRef.current
+    if (!video || !stream) return
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+    }
+    void video.play().catch(() => {})
+  }, [photos.length, shotCount])
+
   // Capture single photo from video
   const capturePhoto = useCallback((): string | null => {
     const video = videoRef.current
@@ -153,18 +191,17 @@ export function Photobooth() {
       ctx.translate(canvas.width, 0)
       ctx.scale(-1, 1)
     }
-    ctx.filter = filterCss
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    ctx.filter = 'none'
     ctx.setTransform(1, 0, 0, 1, 0, 0)
 
     return canvas.toDataURL('image/jpeg', 0.92)
-  }, [filterCss, mirror])
+  }, [mirror])
 
   // Capture sequence
   const runCaptureSequence = useCallback(async () => {
     if (status !== 'ready') return
 
+    setShowResultView(false)
     setStatus('capturing')
     setPhotos([])
     const collected: string[] = []
@@ -201,6 +238,7 @@ export function Photobooth() {
 
   const resetPhotos = useCallback(() => {
     setPhotos([])
+    setShowResultView(false)
     // Acak lagi supaya sesi berikutnya pose-nya beda
     setPoseSequence(buildPoseSequence(shotCount, poseMode))
   }, [shotCount, poseMode])
@@ -212,20 +250,30 @@ export function Photobooth() {
   const handleDownload = useCallback(() => {
     const canvas = stripCanvasRef.current
     if (!canvas) return
+    const dataUrl = canvas.toDataURL('image/png')
+    const filename = `snapbooth-${Date.now()}.png`
     const link = document.createElement('a')
-    link.download = `snapbooth-${Date.now()}.png`
-    link.href = canvas.toDataURL('image/png')
+    link.download = filename
+    link.href = dataUrl
+    link.rel = 'noopener'
+    link.target = '_blank'
+    document.body.appendChild(link)
     link.click()
+    document.body.removeChild(link)
   }, [])
 
   const handleShare = useCallback(async () => {
     const canvas = stripCanvasRef.current
     if (!canvas) return
     canvas.toBlob(async (blob) => {
-      if (!blob) return
+      if (!blob) {
+        handleDownload()
+        return
+      }
       const file = new File([blob], 'snapbooth.png', { type: 'image/png' })
       if (
         typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
         navigator.canShare?.({ files: [file] })
       ) {
         try {
@@ -243,8 +291,15 @@ export function Photobooth() {
     }, 'image/png')
   }, [handleDownload])
 
-  const hasResult = photos.length === shotCount && photos.length > 0
+  const hasCaptureResult = photos.length === shotCount && photos.length > 0
+  const hasResult = hasCaptureResult && showResultView
   const busy = status === 'capturing'
+
+  useEffect(() => {
+    if (shotCount > 4 && templateId === 'grid-2x2') {
+      setTemplateId('classic-strip')
+    }
+  }, [shotCount, templateId])
 
   // Pose yang sedang ditampilkan di panel & PIP
   const activePose = useMemo(() => {
@@ -257,15 +312,28 @@ export function Photobooth() {
     [poseSequence],
   )
 
+  const { outputPhotoIndices, outputPhotos, outputPoseTitles, toggleSelectedPhoto } = useSelectedPhotos({
+    photos,
+    poseTitles,
+  })
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+    <div
+      className={cn(
+        'grid gap-6',
+        'lg:grid-cols-[minmax(0,1fr)_460px] xl:grid-cols-[minmax(0,1fr)_520px]',
+      )}
+    >
       {/* LEFT: Camera / Strip */}
       <div className="space-y-4">
         {hasResult ? (
           <ResultView
-            photos={photos}
-            poseTitles={poseTitles}
+            photos={outputPhotos}
+            poseTitles={outputPoseTitles}
             frameColor={frameColor}
+            templateId={templateId}
+            stickerThemeId={stickerThemeId}
+            polaroidColor={polaroidColor}
             caption={caption}
             showDate={showDate}
             onCanvasReady={(c) => (stripCanvasRef.current = c)}
@@ -280,35 +348,38 @@ export function Photobooth() {
         ) : (
           <>
             {/* Mode picker — pilih Solo / Couple / Campur sebelum mulai */}
-            <ModePicker
-              mode={poseMode}
-              onChange={setPoseMode}
-              disabled={busy}
-            />
+            <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+              <ModePicker
+                mode={poseMode}
+                onChange={setPoseMode}
+                disabled={busy}
+              />
 
-            {/* Pose example panel — muncul DI ATAS kamera */}
-            <PosePanel
-              pose={activePose}
-              active={status === 'capturing'}
-              index={Math.min(currentShot, poseSequence.length - 1)}
-              total={poseSequence.length}
-            />
+              {/* Pose example panel */}
+              <PosePanel
+                pose={activePose}
+                active={status === 'capturing'}
+                index={Math.min(currentShot, poseSequence.length - 1)}
+                total={poseSequence.length}
+              />
+            </div>
 
-            <CameraStage
-              ref={videoRef}
-              status={status}
-              errorMessage={error}
-              filterCss={filterCss}
-              mirror={mirror}
-              countdown={countdown}
-              flash={flash}
-              currentShot={currentShot}
-              totalShots={shotCount}
-              pose={activePose}
-              canFlipCamera={canFlipCamera}
-              onRequestCamera={() => void startCamera()}
-              onFlipCamera={flipCamera}
-            />
+            <div className="mx-auto w-full max-w-[620px]">
+              <CameraStage
+                ref={videoRef}
+                status={status}
+                errorMessage={error}
+                mirror={mirror}
+                countdown={countdown}
+                flash={flash}
+                currentShot={currentShot}
+                totalShots={shotCount}
+                pose={activePose}
+                canFlipCamera={canFlipCamera}
+                onRequestCamera={() => void startCamera()}
+                onFlipCamera={flipCamera}
+              />
+            </div>
 
             {/* Capture CTA */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-sm">
@@ -331,47 +402,74 @@ export function Photobooth() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={runCaptureSequence}
-                disabled={status !== 'ready'}
-                className={cn(
-                  'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold shadow-lg transition sm:w-auto',
-                  'bg-primary text-primary-foreground hover:brightness-110',
-                  'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                <button
+                  type="button"
+                  onClick={runCaptureSequence}
+                  disabled={status !== 'ready'}
+                  className={cn(
+                    'inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold shadow-lg transition sm:flex-none',
+                    'bg-primary text-primary-foreground hover:brightness-110',
+                    'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
+                  )}
+                >
+                  <Camera className="h-4 w-4" aria-hidden="true" />
+                  Mulai Memotret
+                </button>
+                {hasCaptureResult && (
+                  <button
+                    type="button"
+                    onClick={() => setShowResultView(true)}
+                    className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full border border-border bg-background px-6 py-3 text-sm font-semibold transition hover:bg-secondary sm:flex-none"
+                  >
+                    Lanjut ke Hasil
+                  </button>
                 )}
-              >
-                <Camera className="h-4 w-4" aria-hidden="true" />
-                Mulai Memotret
-              </button>
+              </div>
             </div>
           </>
         )}
       </div>
 
       {/* RIGHT: Controls */}
-      <aside className="rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="font-serif text-xl">Kustomisasi</h2>
-          <span className="rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-semibold tracking-wider text-accent-foreground uppercase">
-            Live
-          </span>
-        </div>
-        <Controls
-          selectedFilter={filterId}
-          onFilterChange={setFilterId}
+      {hasResult ? (
+        <ResultCustomizer
+          photos={photos}
+          selectedPhotoIndices={outputPhotoIndices}
+          onTogglePhoto={toggleSelectedPhoto}
           selectedFrame={frameColor}
           onFrameChange={setFrameColor}
-          shotCount={shotCount}
-          onShotCountChange={setShotCount}
-          countdownSeconds={countdownSeconds}
-          onCountdownChange={setCountdownSeconds}
-          mirror={mirror}
-          onMirrorChange={setMirror}
-          onShufflePoses={reshufflePoses}
-          disabled={busy}
+          polaroidColor={polaroidColor}
+          onPolaroidColorChange={setPolaroidColor}
+          selectedTemplate={templateId}
+          onTemplateChange={setTemplateId}
+          selectedSticker={stickerThemeId}
+          onStickerChange={setStickerThemeId}
         />
-      </aside>
+      ) : (
+        <aside className="rounded-2xl border bg-card p-5 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="font-serif text-xl">Pengaturan Foto</h2>
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-semibold tracking-wider text-accent-foreground uppercase">
+              Pra-Foto
+            </span>
+          </div>
+          <Controls
+            selectedFrame={frameColor}
+            onFrameChange={setFrameColor}
+            shotCount={shotCount}
+            onShotCountChange={setShotCount}
+            countdownSeconds={countdownSeconds}
+            onCountdownChange={setCountdownSeconds}
+            mirror={mirror}
+            onMirrorChange={setMirror}
+            onShufflePoses={reshufflePoses}
+            livePhotos={photos}
+            disabled={busy}
+            hideStyleControls
+          />
+        </aside>
+      )}
     </div>
   )
 }
@@ -380,6 +478,9 @@ function ResultView({
   photos,
   poseTitles,
   frameColor,
+  templateId,
+  stickerThemeId,
+  polaroidColor,
   caption,
   showDate,
   onCanvasReady,
@@ -392,6 +493,9 @@ function ResultView({
   photos: string[]
   poseTitles: string[]
   frameColor: string
+  templateId: string
+  stickerThemeId: string
+  polaroidColor: string
   caption: string
   showDate: boolean
   onCanvasReady: (c: HTMLCanvasElement) => void
@@ -408,6 +512,9 @@ function ResultView({
           photos={photos}
           poseTitles={poseTitles}
           frameColorId={frameColor}
+          templateId={templateId}
+          stickerThemeId={stickerThemeId}
+          polaroidColor={polaroidColor}
           caption={caption}
           showDate={showDate}
           onCanvasReady={onCanvasReady}
@@ -443,7 +550,7 @@ function ResultView({
               type="checkbox"
               checked={showDate}
               onChange={(e) => onShowDateChange(e.target.checked)}
-              className="h-4 w-4 rounded border-input accent-[var(--primary)]"
+              className="h-4 w-4 rounded border-input accent-primary"
             />
             Tampilkan tanggal
           </label>
@@ -453,7 +560,7 @@ function ResultView({
           <button
             type="button"
             onClick={onDownload}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition hover:brightness-110"
+            className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition hover:brightness-110"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             Download
@@ -461,7 +568,7 @@ function ResultView({
           <button
             type="button"
             onClick={onShare}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
           >
             <Share2 className="h-4 w-4" aria-hidden="true" />
             Bagikan
@@ -469,7 +576,7 @@ function ResultView({
           <button
             type="button"
             onClick={onRetake}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary"
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Ambil Lagi
@@ -543,7 +650,7 @@ function ModePicker({
               onClick={() => onChange(opt.id)}
               disabled={disabled}
               className={cn(
-                'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-xs font-semibold transition',
+                'flex min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-xs font-semibold transition',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 active
                   ? 'border-primary bg-primary text-primary-foreground shadow-sm'

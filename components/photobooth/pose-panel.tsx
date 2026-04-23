@@ -9,18 +9,20 @@ interface PosePanelProps {
   active: boolean
   index: number
   total: number
+  embedded?: boolean
 }
 
 /**
  * Panel muncul DI ATAS preview kamera, menampilkan ilustrasi SVG pose
  * yang harus ditiru untuk foto berikutnya.
  */
-export function PosePanel({ pose, active, index, total }: PosePanelProps) {
+export function PosePanel({ pose, active, index, total, embedded }: PosePanelProps) {
   const { Scene, title, description, type, accent } = pose
   return (
     <div
       className={cn(
         'relative flex items-stretch gap-3 rounded-2xl border bg-card p-2.5 shadow-sm transition-all sm:gap-4 sm:p-3',
+        embedded && 'rounded-xl border-0 bg-transparent p-0 shadow-none',
         active ? 'ring-2 ring-primary/40' : '',
       )}
       aria-live="polite"
@@ -43,7 +45,7 @@ export function PosePanel({ pose, active, index, total }: PosePanelProps) {
       <div className="relative min-w-0 flex-1 py-1">
         <div
           aria-hidden="true"
-          className="absolute top-1/2 -left-[9px] hidden h-3 w-3 -translate-y-1/2 rotate-45 rounded-sm bg-card ring-1 ring-border sm:block"
+          className="absolute top-1/2 left-[-9px] hidden h-3 w-3 -translate-y-1/2 rotate-45 rounded-sm bg-card ring-1 ring-border sm:block"
           style={{ clipPath: 'polygon(0 0, 0 100%, 100% 100%)' }}
         />
         <div className="flex flex-wrap items-center gap-1.5">
@@ -60,7 +62,7 @@ export function PosePanel({ pose, active, index, total }: PosePanelProps) {
         <p className="mt-1 line-clamp-2 text-xs text-foreground/80 text-pretty sm:line-clamp-none sm:text-sm">
           {description}
         </p>
-      </div>
+      </div>  
     </div>
   )
 }

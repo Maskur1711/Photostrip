@@ -2,11 +2,9 @@
 
 import { Check, FlipHorizontal2, Shuffle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FILTERS, FRAME_COLORS, type FilterId } from './filters'
+import { FRAME_STYLES } from './filters'
 
 interface ControlsProps {
-  selectedFilter: FilterId
-  onFilterChange: (id: FilterId) => void
   selectedFrame: string
   onFrameChange: (id: string) => void
   shotCount: number
@@ -16,12 +14,12 @@ interface ControlsProps {
   mirror: boolean
   onMirrorChange: (v: boolean) => void
   onShufflePoses: () => void
+  livePhotos?: string[]
   disabled?: boolean
+  hideStyleControls?: boolean
 }
 
 export function Controls({
-  selectedFilter,
-  onFilterChange,
   selectedFrame,
   onFrameChange,
   shotCount,
@@ -31,7 +29,9 @@ export function Controls({
   mirror,
   onMirrorChange,
   onShufflePoses,
+  livePhotos,
   disabled,
+  hideStyleControls,
 }: ControlsProps) {
   return (
     <div className="space-y-6">
@@ -51,7 +51,7 @@ export function Controls({
               onClick={onShufflePoses}
               disabled={disabled}
               className={cn(
-                'mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-background px-3 py-1.5 text-xs font-semibold text-primary transition',
+                'cursor-pointer  mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-background px-3 py-1.5 text-xs font-semibold text-primary transition',
                 'hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50',
               )}
             >
@@ -62,98 +62,62 @@ export function Controls({
         </div>
       </section>
 
-      {/* Filters */}
-      <section>
-        <SectionHeader title="Filter" />
-        <div className="grid grid-cols-4 gap-2">
-          {FILTERS.map((f) => {
-            const active = f.id === selectedFilter
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => onFilterChange(f.id)}
-                disabled={disabled}
-                className={cn(
-                  'group relative flex aspect-square flex-col items-center justify-end overflow-hidden rounded-xl border p-2 text-[11px] font-medium transition',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
-                  active
-                    ? 'border-primary ring-2 ring-primary/40'
-                    : 'border-border hover:border-foreground/30',
-                )}
-                aria-pressed={active}
-              >
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      'linear-gradient(135deg, oklch(0.85 0.08 30), oklch(0.7 0.14 45))',
-                    filter: f.css,
-                  }}
-                />
-                <span className="relative z-10 rounded-md bg-background/85 px-1.5 py-0.5 text-foreground backdrop-blur-sm">
-                  {f.label}
-                </span>
-                {active && (
-                  <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-3 w-3" aria-hidden="true" />
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </section>
+      {!hideStyleControls && (
+        <>
+          {/* Frame style */}
+          <section>
+            <SectionHeader title="Style Frame" />
+            <div className="grid grid-cols-3 gap-2">
+              {FRAME_STYLES.map((c) => {
+                const active = c.id === selectedFrame
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => onFrameChange(c.id)}
+                    disabled={disabled}
+                    aria-pressed={active}
+                    aria-label={`Frame ${c.label}`}
+                    className={cn(
+                      'cursor-pointer relative flex min-h-14 items-end justify-start overflow-hidden rounded-xl border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50',
+                      active
+                        ? 'border-primary ring-2 ring-primary/40'
+                        : 'border-border hover:border-foreground/40',
+                    )}
+                    style={{ background: `linear-gradient(135deg, ${c.bg}, ${c.fg}33)` }}
+                  >
+                    <span className="relative z-10 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-semibold">
+                      {c.label}
+                    </span>
+                    {active && (
+                      <Check
+                        className="absolute top-1.5 right-1.5 h-4 w-4"
+                        style={{ color: c.kind === 'love' ? '#fff' : c.fg }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
 
-      {/* Frame color */}
-      <section>
-        <SectionHeader title="Warna Frame" />
-        <div className="flex flex-wrap gap-2">
-          {FRAME_COLORS.map((c) => {
-            const active = c.id === selectedFrame
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onFrameChange(c.id)}
-                disabled={disabled}
-                aria-pressed={active}
-                aria-label={`Frame ${c.label}`}
-                className={cn(
-                  'relative h-11 w-11 rounded-full border-2 transition disabled:cursor-not-allowed disabled:opacity-50',
-                  active
-                    ? 'border-primary ring-2 ring-primary/40 ring-offset-2 ring-offset-background'
-                    : 'border-border hover:border-foreground/40',
-                )}
-                style={{ backgroundColor: c.bg }}
-              >
-                {active && (
-                  <Check
-                    className="absolute inset-0 m-auto h-4 w-4"
-                    style={{ color: c.fg }}
-                    aria-hidden="true"
-                  />
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </section>
+        </>
+      )}
 
       {/* Shot count & countdown */}
       <section className="grid grid-cols-2 gap-4">
         <div>
           <SectionHeader title="Jumlah Foto" />
-          <div className="flex gap-2">
-            {[3, 4].map((n) => (
+          <div className="grid grid-cols-3 gap-2">
+            {[2, 4, 6, 8].map((n) => (
               <button
                 key={n}
                 type="button"
                 onClick={() => onShotCountChange(n)}
                 disabled={disabled}
                 className={cn(
-                  'flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+                  'cursor-pointer flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
                   shotCount === n
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border hover:border-foreground/30',
@@ -175,7 +139,7 @@ export function Controls({
                 onClick={() => onCountdownChange(n)}
                 disabled={disabled}
                 className={cn(
-                  'flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+                  'cursor-pointer flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
                   countdownSeconds === n
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border hover:border-foreground/30',
@@ -196,7 +160,7 @@ export function Controls({
           onClick={() => onMirrorChange(!mirror)}
           disabled={disabled}
           className={cn(
-            'flex min-h-11 w-full items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+            'cursor-pointer flex min-h-11 w-full items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
             mirror
               ? 'border-primary bg-primary/5'
               : 'border-border hover:border-foreground/30',
@@ -223,6 +187,24 @@ export function Controls({
           </span>
         </button>
       </section>
+
+      {!!livePhotos?.length && (
+        <section>
+          <SectionHeader title="Hasil Sementara" />
+          <div className="max-h-[210px] overflow-y-auto rounded-xl border p-2">
+            <div className="grid grid-cols-2 gap-2">
+            {livePhotos.map((src, idx) => (
+              <img
+                key={idx}
+                src={src}
+                alt={`Hasil foto ${idx + 1}`}
+                className="aspect-4/3 w-full rounded-md border object-cover"
+              />
+            ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   )
 }
@@ -234,3 +216,4 @@ function SectionHeader({ title }: { title: string }) {
     </h3>
   )
 }
+

@@ -99,7 +99,7 @@ export default function Page() {
 
       {/* Photobooth */}
       <section id="photobooth" className="scroll-mt-20">
-        <div className="mx-auto max-w-6xl px-4 pb-16 md:px-6">
+        <div className="mx-auto max-w-8xl px-4 pb-16 md:px-6">
           <Photobooth />
         </div>
       </section>

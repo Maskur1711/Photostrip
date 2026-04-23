@@ -8,7 +8,6 @@ import type { Pose } from './poses'
 interface CameraStageProps {
   status: 'idle' | 'loading' | 'ready' | 'error' | 'capturing'
   errorMessage?: string | null
-  filterCss: string
   mirror: boolean
   countdown: number | null
   flash: boolean
@@ -25,7 +24,6 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
     {
       status,
       errorMessage,
-      filterCss,
       mirror,
       countdown,
       flash,
@@ -42,7 +40,7 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
     const { Scene, title } = pose
 
     return (
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-foreground/95 shadow-xl ring-1 ring-border">
+      <div className="relative aspect-4/3 w-full overflow-hidden rounded-2xl bg-foreground/95 shadow-xl ring-1 ring-border">
         {/* Video feed — playsInline essential for iOS mobile */}
         <video
           ref={ref}
@@ -54,9 +52,7 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
             mirror && 'scale-x-[-1]',
             status !== 'ready' && status !== 'capturing' && 'opacity-0',
           )}
-          style={{ filter: filterCss }}
         />
-
         {/* Idle state */}
         {status === 'idle' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center text-background">
@@ -75,7 +71,7 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
             <button
               type="button"
               onClick={onRequestCamera}
-              className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-lg transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-foreground/95 focus-visible:outline-none"
+              className="cursor-pointer mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-lg transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-foreground/95 focus-visible:outline-none"
             >
               <Camera className="h-4 w-4" aria-hidden="true" />
               Nyalakan Kamera
@@ -107,7 +103,7 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
             <button
               type="button"
               onClick={onRequestCamera}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-lg transition hover:brightness-110"
+              className="cursor-pointer inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-lg transition hover:brightness-110"
             >
               Coba lagi
             </button>
@@ -122,7 +118,7 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
             disabled={status === 'capturing'}
             aria-label="Ganti kamera depan/belakang"
             className={cn(
-              'absolute top-3 right-3 inline-flex h-11 w-11 items-center justify-center rounded-full',
+              'cursor-pointer absolute top-3 right-3 inline-flex h-11 w-11 items-center justify-center rounded-full',
               'bg-foreground/60 text-background shadow backdrop-blur-sm transition',
               'hover:bg-foreground/75 disabled:cursor-not-allowed disabled:opacity-50',
               'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
@@ -143,7 +139,7 @@ export const CameraStage = forwardRef<HTMLVideoElement, CameraStageProps>(
                 className="block h-20 w-28 sm:h-24 sm:w-32"
                 showBackdrop={false}
               />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-foreground/85 to-transparent px-2 py-1">
+              <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-foreground/85 to-transparent px-2 py-1">
                 <p className="text-[9px] font-semibold tracking-wide text-background uppercase">
                   Tirukan
                 </p>

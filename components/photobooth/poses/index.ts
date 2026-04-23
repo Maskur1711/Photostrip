@@ -1,4 +1,5 @@
 import * as S from './scenes'
+import type { ReactElement } from 'react'
 
 export type PoseType = 'solo' | 'couple'
 export type PoseMode = 'solo' | 'couple' | 'mix'
@@ -9,7 +10,7 @@ export interface Pose {
   description: string
   type: PoseType
   accent: string
-  Scene: (props: { className?: string; showBackdrop?: boolean; backdropColor?: string }) => JSX.Element
+  Scene: (props: { className?: string; showBackdrop?: boolean; backdropColor?: string }) => ReactElement
 }
 
 export const POSES: Pose[] = [
@@ -196,17 +197,18 @@ export function shufflePoses<T>(list: T[]): T[] {
 export function buildPoseSequence(
   count: number,
   mode: PoseMode = 'mix',
+  randomize = true,
 ): Pose[] {
   const pool =
     mode === 'mix' ? POSES : POSES.filter((p) => p.type === mode)
-  const shuffled = shufflePoses(pool)
+  const shuffled = randomize ? shufflePoses(pool) : [...pool]
   const seq: Pose[] = []
   let deck = shuffled
   let idx = 0
   while (seq.length < count) {
     if (idx >= deck.length) {
       // reshuffle to keep it feeling fresh when count > pool.length
-      deck = shufflePoses(pool).filter(
+      deck = (randomize ? shufflePoses(pool) : [...pool]).filter(
         (p) => p.id !== seq[seq.length - 1]?.id,
       )
       idx = 0
